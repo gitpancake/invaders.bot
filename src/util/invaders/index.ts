@@ -17,18 +17,6 @@ class SpaceInvaders {
       return null;
     }
   }
-
-  public async getRandomFlash(): Promise<Flash | null> {
-    try {
-      const flashes = await this.getLatestFlashes();
-
-      if (!flashes) return null;
-
-      return [...flashes.with_paris, ...flashes.without_paris].sort(() => 0.5 - Math.random())[0];
-    } catch {
-      return null;
-    }
-  }
 }
 
 export default SpaceInvaders;
