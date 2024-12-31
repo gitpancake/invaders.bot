@@ -1,5 +1,6 @@
 import axios from "axios";
 import { config } from "dotenv";
+import cron from "node-cron";
 import { uploadImageHandler } from "./util/images/uploader";
 import SpaceInvaders from "./util/invaders";
 
@@ -33,14 +34,13 @@ const main = async () => {
     console.log(ex);
   }
 };
-main()
-  .then(() => {
-    console.log("Done!");
-  })
-  .catch((err) => {
-    console.log(err);
-  });
 
-// cron.schedule("* * * * *", () => {
-
-// });
+cron.schedule("* * * * *", () => {
+  main()
+    .then(() => {
+      console.log("Done!");
+    })
+    .catch((err) => {
+      console.log(err);
+    });
+});
