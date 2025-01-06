@@ -1,4 +1,5 @@
 import axios from "axios";
+import { fromUnixTime, sub } from "date-fns";
 import { config } from "dotenv";
 import cron from "node-cron";
 import { uploadImageHandler } from "./util/images/uploader";
@@ -44,7 +45,7 @@ const city_specific = async () => {
     return;
   }
 
-  const flashes = [...invaders.with_paris, ...invaders.without_paris].filter((x) => cities.includes(x.city));
+  const flashes = [...invaders.without_paris].filter((x) => cities.includes(x.city) && fromUnixTime(x.timestamp) > sub(new Date(), { minutes: 1 }));
 
   if (!flashes.length) {
     return;
@@ -52,6 +53,10 @@ const city_specific = async () => {
 
   try {
     const flashToPost = flashes[Math.round(Math.random() * flashes.length)];
+
+    if (!flashToPost || !flashToPost.img) {
+      return;
+    }
 
     const s3Url = await uploadImageHandler({
       imageUrl: `${new SpaceInvaders().IMAGE_BASE}${flashToPost.img}`,
