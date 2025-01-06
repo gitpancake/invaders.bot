@@ -52,23 +52,19 @@ const city_specific = async () => {
   }
 
   try {
-    const flashToPost = flashes[Math.round(Math.random() * flashes.length)];
+    flashes.map(async (flashToPost) => {
+      const s3Url = await uploadImageHandler({
+        imageUrl: `${new SpaceInvaders().IMAGE_BASE}${flashToPost.img}`,
+        key: flashToPost.img,
+      });
 
-    if (!flashToPost || !flashToPost.img) {
-      return;
-    }
+      await axios.post(`${process.env.API_URL}/api/bot`, {
+        secret: process.env.WEBHOOK_SECRET,
+        flash: { ...flashToPost, img: s3Url },
+      });
 
-    const s3Url = await uploadImageHandler({
-      imageUrl: `${new SpaceInvaders().IMAGE_BASE}${flashToPost.img}`,
-      key: flashToPost.img,
+      console.log(`City specific flash posted: ${flashToPost.city}`);
     });
-
-    await axios.post(`${process.env.API_URL}/api/bot`, {
-      secret: process.env.WEBHOOK_SECRET,
-      flash: { ...flashToPost, img: s3Url },
-    });
-
-    console.log(`City specific flash posted: ${flashToPost.city}`);
   } catch (ex) {
     console.log(ex);
   }
