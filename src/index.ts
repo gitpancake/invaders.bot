@@ -44,6 +44,10 @@ const city_specific = async () => {
 
   const flashes = [...invaders.with_paris, ...invaders.without_paris].filter((x) => x.city.includes("Los Angeles"));
 
+  if (!flashes.length) {
+    return;
+  }
+
   try {
     const flashToPost = flashes[Math.round(Math.random() * flashes.length)];
 
