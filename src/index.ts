@@ -35,6 +35,8 @@ const main = async () => {
 };
 
 const city_specific = async () => {
+  const cities = ["Los Angeles", "New York", "Miami", "San Diego"];
+
   const invaders = await new SpaceInvaders().getLatestFlashes();
 
   if (!invaders) {
@@ -42,7 +44,7 @@ const city_specific = async () => {
     return;
   }
 
-  const flashes = [...invaders.with_paris, ...invaders.without_paris].filter((x) => x.city.includes("Los Angeles"));
+  const flashes = [...invaders.with_paris, ...invaders.without_paris].filter((x) => cities.includes(x.city));
 
   if (!flashes.length) {
     return;
