@@ -17,8 +17,9 @@ const main = async () => {
   }
 
   const flashes = [...invaders.with_paris, ...invaders.without_paris];
+  const mongo = new MongoDBService("flashes");
 
-  await new MongoDBService("invaders", "flashes").writeMany(flashes);
+  await mongo.writeMany(flashes);
 
   try {
     const flashToPost = flashes[Math.round(Math.random() * flashes.length)];
@@ -32,6 +33,9 @@ const main = async () => {
       secret: process.env.WEBHOOK_SECRET,
       flash: { ...flashToPost, img: s3Url },
     });
+
+    await mongo.updateDocument({ flash_id: flashToPost.flash_id }, { posted: true });
+
     console.log(`Flash posted for ${flashToPost.city}`);
   } catch (ex) {
     console.log(ex);
@@ -55,6 +59,8 @@ const city_specific = async () => {
   }
 
   try {
+    await new MongoDBService("flashes").writeMany(flashes.map((flash) => ({ ...flash, posted: true })));
+
     flashes.map(async (flashToPost) => {
       const s3Url = await uploadImageHandler({
         imageUrl: `${new SpaceInvaders().IMAGE_BASE}${flashToPost.img}`,

@@ -8,8 +8,9 @@ class MongoDBService {
   private client: MongoClient;
   private db: Db | null = null;
   private collection: Collection<Flash> | null = null;
+  private dbName: string = "invaders";
 
-  constructor(private dbName: string, private collectionName: string) {
+  constructor(private collectionName: string) {
     const mongoUri = process.env.MONGO_URI;
 
     if (!mongoUri) {
@@ -84,6 +85,22 @@ class MongoDBService {
       console.log("Disconnected from MongoDB");
     } catch (error) {
       console.error("Error disconnecting from MongoDB:", error);
+      throw error;
+    }
+  }
+
+  public async updateDocument(filter: Partial<Flash>, update: Partial<Flash>): Promise<void> {
+    if (!this.collection) {
+      throw new Error("Not connected to the database");
+    }
+    try {
+      const result = await this.collection.updateOne(filter, { $set: update });
+      if (result.matchedCount === 0) {
+        throw new Error("No document found matching the filter criteria");
+      }
+      console.log("Document updated successfully");
+    } catch (error) {
+      console.error("Error updating document:", error);
       throw error;
     }
   }
