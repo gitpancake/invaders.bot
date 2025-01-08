@@ -20,13 +20,3 @@ class SpaceInvaders {
 }
 
 export default SpaceInvaders;
-
-/**
- * "img": "/media/queries/2024/12/29/image_mGJJwig.jpg",
-"city": "Paris",
-"text": "Paris, CHARLES_BEST",
-"player": "CHARLES_BEST",
-"flash_id": 76707905,
-"timestamp": 1735465136.013294,
-"flash_count": "30 658 715"
- */

@@ -4,6 +4,7 @@ import { config } from "dotenv";
 import cron from "node-cron";
 import { uploadImageHandler } from "./util/images/uploader";
 import SpaceInvaders from "./util/invaders";
+import MongoDBService from "./util/mongodb";
 
 config({ path: ".env" });
 
@@ -16,6 +17,8 @@ const main = async () => {
   }
 
   const flashes = [...invaders.with_paris, ...invaders.without_paris];
+
+  await new MongoDBService("invaders", "flashes").writeMany(flashes);
 
   try {
     const flashToPost = flashes[Math.round(Math.random() * flashes.length)];
