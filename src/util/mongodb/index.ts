@@ -26,6 +26,8 @@ class MongoDBService {
 
       this.db = this.client.db(this.dbName);
       this.collection = this.db.collection<Flash>(this.collectionName);
+
+      await this.collection.createIndex({ flash_id: 1 }, { unique: true });
     } catch (error) {
       console.error("Error connecting to MongoDB:", error);
       throw error;
@@ -45,24 +47,55 @@ class MongoDBService {
     }
   }
 
+  public async getRandomDocument(filter: Partial<Flash> = {}): Promise<Flash> {
+    if (!this.collection) {
+      throw new Error("Not connected to the database");
+    }
+    try {
+      const count = await this.collection.countDocuments(filter);
+      const randomIndex = Math.floor(Math.random() * count);
+      const flash = await this.collection.find(filter).limit(1).skip(randomIndex).next();
+
+      if (!flash) {
+        return await this.getRandomDocument(filter);
+      }
+
+      return flash;
+    } catch (error) {
+      console.error("Error reading documents:", error);
+      throw error;
+    }
+  }
+
+  public async getMultipleByFlashId(flashIds: number[]): Promise<Flash[]> {
+    if (!this.collection) {
+      throw new Error("Not connected to the database");
+    }
+    try {
+      return await this.collection.find<Flash>({ flash_id: { $in: flashIds } }).toArray();
+    } catch (error) {
+      console.error("Error reading documents:", error);
+      throw error;
+    }
+  }
+
   // Write a document to the collection
   public async writeMany(flashes: Flash[]): Promise<void> {
     if (!this.collection) {
       throw new Error("Not connected to the database");
     }
-    try {
-      const bulkOps = flashes.map((flash) => ({
-        updateOne: {
-          filter: { flash_id: flash.flash_id },
-          update: { $setOnInsert: flash },
-          upsert: true, // Insert only if the document doesn't already exist
-        },
-      }));
 
-      await this.collection.bulkWrite(bulkOps, { ordered: false });
-    } catch (error) {
-      console.error("Error writing unique documents:", error);
-      throw error;
+    try {
+      // Use `ordered: false` to continue inserting other documents even if some fail due to duplication
+      await this.collection.insertMany(flashes, { ordered: false });
+    } catch (error: any) {
+      if (error.code === 11000) {
+        // Duplicate key error (MongoDB error code for unique constraint violation)
+        console.warn("Some flashes were not inserted due to duplicate flash_id values.");
+      } else {
+        console.error("Error writing documents:", error);
+        throw error;
+      }
     }
   }
 
@@ -101,6 +134,22 @@ class MongoDBService {
       console.log("Document updated successfully");
     } catch (error) {
       console.error("Error updating document:", error);
+      throw error;
+    }
+  }
+
+  public async updateManyDocuments(filter: Partial<Flash>, update: Partial<Flash>): Promise<void> {
+    if (!this.collection) {
+      throw new Error("Not connected to the database");
+    }
+    try {
+      const result = await this.collection.updateMany(filter, { $set: update });
+      if (result.matchedCount === 0) {
+        throw new Error("No documents found matching the filter criteria");
+      }
+      console.log("Documents updated successfully");
+    } catch (error) {
+      console.error("Error updating documents:", error);
       throw error;
     }
   }
