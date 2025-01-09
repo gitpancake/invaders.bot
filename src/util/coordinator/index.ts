@@ -1,8 +1,11 @@
 import axios from "axios";
+import { config } from "dotenv";
 import { uploadImagesInBatches } from "../images/uploader";
 import SpaceInvaders from "../invaders";
 import { Flash } from "../invaders/types";
 import MongoDBService from "../mongodb";
+
+config({ path: ".env" });
 
 class Coordinator {
   private invaders: SpaceInvaders;
@@ -18,7 +21,7 @@ class Coordinator {
     try {
       await axios.post(`${process.env.API_URL}/api/bot`, {
         secret: process.env.WEBHOOK_SECRET,
-        flash: { ...flash, img: `${process.env.S3_URL}${flash.img}` },
+        flash,
       });
     } catch (error) {
       console.error(`Error posting flash ${flash.flash_id}:`, error);
