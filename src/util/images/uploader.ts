@@ -16,7 +16,7 @@ const s3Client = new S3Client({
 });
 
 export const uploadImagesInBatches = async (requests: UploadImageRequest[], batchSize: number): Promise<string[]> => {
-  console.log(`Uploading ${requests.length} images in batches of ${batchSize}`);
+  // console.log(`Uploading ${requests.length} images in batches of ${batchSize}`);
 
   const results: string[] = [];
 
@@ -37,7 +37,7 @@ export const uploadImagesInBatches = async (requests: UploadImageRequest[], batc
     );
     results.push(...(batchResults.filter((result) => result !== null) as string[]));
 
-    console.log(`Uploaded ${results.length} images`);
+    // console.log(`Uploaded ${results.length} images`);
   }
 
   return results;

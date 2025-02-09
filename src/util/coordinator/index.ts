@@ -62,7 +62,7 @@ class Coordinator {
     });
 
     if (!unpostedFlashes.length) {
-      console.log("No unposted flashes found.");
+      // console.log("No unposted flashes found.");
       return;
     }
 
@@ -72,7 +72,7 @@ class Coordinator {
         unpostedFlashes.map(async (flash) => {
           await this.postFlash(flash);
           await this.updateFlashAsPosted(flash.flash_id);
-          console.log(`City-specific flash posted: ${flash.city}`);
+          // console.log(`City-specific flash posted: ${flash.city}`);
         })
       );
     } else {
@@ -80,22 +80,24 @@ class Coordinator {
       const randomFlash = unpostedFlashes[Math.floor(Math.random() * unpostedFlashes.length)];
       await this.postFlash(randomFlash);
       await this.updateFlashAsPosted(randomFlash.flash_id);
-      console.log(`Random flash posted: ${randomFlash.city}`);
+      // console.log(`Random flash posted: ${randomFlash.city}`);
     }
+
+    console.log(`Posted ${unpostedFlashes.length} flashes${cities ? " in cities: " + cities.join(", ") : ""}`);
   }
 
   public async fetchFlashes(cities?: string[]): Promise<void> {
     const latestFlashes = await this.invaders.getLatestFlashes();
 
     if (!latestFlashes) {
-      console.log("No response from flashes API");
+      // console.log("No response from flashes API");
       return;
     }
 
     const flashes = [...latestFlashes.without_paris, ...latestFlashes.with_paris].filter((flash) => (cities ? cities.includes(flash.city) : true));
 
     if (!flashes.length) {
-      console.log(`No recent flashes found${cities ? " in cities: " + cities.join(", ") : ""}`);
+      // console.log(`No recent flashes found${cities ? " in cities: " + cities.join(", ") : ""}`);
       return;
     }
 

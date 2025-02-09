@@ -6,12 +6,12 @@ config({ path: ".env" });
 
 cron.schedule("*/5 * * * *", async () => {
   await new Coordinator().fetchFlashes(["Los Angeles", "New York", "Miami", "San Diego"]).catch((err) => {
-    console.log(err);
+    console.error(err);
   });
 });
 
 cron.schedule("*/15 * * * *", async () => {
   await new Coordinator().fetchFlashes().catch((err) => {
-    console.log(err);
+    console.error(err);
   });
 });

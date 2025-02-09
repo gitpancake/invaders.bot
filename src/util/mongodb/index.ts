@@ -115,7 +115,7 @@ class MongoDBService {
   public async disconnect(): Promise<void> {
     try {
       await this.client.close();
-      console.log("Disconnected from MongoDB");
+      // console.log("Disconnected from MongoDB");
     } catch (error) {
       console.error("Error disconnecting from MongoDB:", error);
       throw error;
@@ -131,7 +131,7 @@ class MongoDBService {
       if (result.matchedCount === 0) {
         throw new Error("No document found matching the filter criteria");
       }
-      console.log("Document updated successfully");
+      // console.log("Document updated successfully");
     } catch (error) {
       console.error("Error updating document:", error);
       throw error;
@@ -147,7 +147,7 @@ class MongoDBService {
       if (result.matchedCount === 0) {
         throw new Error("No documents found matching the filter criteria");
       }
-      console.log("Documents updated successfully");
+      // console.log("Documents updated successfully");
     } catch (error) {
       console.error("Error updating documents:", error);
       throw error;
