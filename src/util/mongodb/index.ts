@@ -91,7 +91,7 @@ class MongoDBService {
     } catch (error: any) {
       if (error.code === 11000) {
         // Duplicate key error (MongoDB error code for unique constraint violation)
-        console.warn("Some flashes were not inserted due to duplicate flash_id values.");
+        // console.warn("Some flashes were not inserted due to duplicate flash_id values.");
       } else {
         console.error("Error writing documents:", error);
         throw error;

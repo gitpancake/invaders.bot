@@ -83,7 +83,7 @@ class Coordinator {
       // console.log(`Random flash posted: ${randomFlash.city}`);
     }
 
-    console.log(`Posted ${unpostedFlashes.length} flashes${cities ? " in cities: " + cities.join(", ") : ""}`);
+    console.log(`Saved ${unpostedFlashes.length} flashes${cities ? " in cities: " + cities.join(", ") : ""}`);
   }
 
   public async fetchFlashes(cities?: string[]): Promise<void> {
