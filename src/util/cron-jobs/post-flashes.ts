@@ -18,7 +18,10 @@ export class PostRandomFlashCron extends CronTask {
       const time_threshold = getUnixTime(sub(new Date(), { minutes: 30 }));
 
       const randomFlash = await mongo.getRandomDocument({
-        posted: false,
+        $or: [
+          { posted: true },
+          { posted: { $exists: false } }, // Matches documents where `posted` is `null` or missing
+        ],
         timestamp: { $gte: time_threshold },
       });
 
@@ -37,6 +40,8 @@ export class PostRandomFlashCron extends CronTask {
           posted: true,
         }
       );
+
+      console.log(`Posted flash with id ${randomFlash.flash_id}`);
     } catch (err) {
       console.error("Error fetching random flash:", err);
     } finally {

@@ -5,7 +5,7 @@ import { StoreFlashesCron } from "./util/cron-jobs/store-flashes";
 
 config({ path: ".env" });
 
-new PostRandomFlashCron("*/5 * * * *").register();
+new PostRandomFlashCron("*/5 * * * *").task();
 
 new StoreFlashesCron("*/1 * * * *").register();
 
