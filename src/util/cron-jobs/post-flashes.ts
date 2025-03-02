@@ -1,6 +1,7 @@
 import { getUnixTime, sub } from "date-fns";
 import { InvadersFunHandler } from "../invaders.fun";
 import MongoDBService from "../mongodb";
+import { formattedCurrentTime } from "../times";
 import { CronTask } from "./base";
 
 export class PostRandomFlashCron extends CronTask {
@@ -40,7 +41,7 @@ export class PostRandomFlashCron extends CronTask {
         }
       );
 
-      console.log(`Posted flash with id ${randomFlash.flash_id}`);
+      console.log(`Posted #${randomFlash.flash_id}. ${formattedCurrentTime}`);
     } catch (err) {
       console.error("Error fetching random flash:", err);
     } finally {
