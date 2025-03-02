@@ -5,8 +5,8 @@ import { StoreFlashesCron } from "./util/cron-jobs/store-flashes";
 
 config({ path: ".env" });
 
-new PostRandomFlashCron("*/5 * * * *").register();
+new PostRandomFlashCron("*/10 * * * *").register();
 
-new StoreFlashesCron("*/1 * * * *").register();
+new StoreFlashesCron("*/5 * * * *").register();
 
 new ChannelRefresher("* */1 * * *").register();
