@@ -1,5 +1,4 @@
 import { getUnixTime, sub } from "date-fns";
-import cron from "node-cron";
 import { InvadersFunHandler } from "../invaders.fun";
 import MongoDBService from "../mongodb";
 import { CronTask } from "./base";
@@ -47,14 +46,5 @@ export class PostRandomFlashCron extends CronTask {
     } finally {
       await mongo.disconnect();
     }
-  }
-
-  public register(): void {
-    console.log(`Registering ${this.name} cron job`);
-
-    cron.schedule(this.schedule, async () => {
-      console.log(`Refreshing channel casts`);
-      await this.task();
-    });
   }
 }

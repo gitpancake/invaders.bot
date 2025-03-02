@@ -1,5 +1,4 @@
 import { format } from "date-fns";
-import cron from "node-cron";
 import { InvaderFlash, InvaderFlashCache } from "../cache";
 import SpaceInvadersAPI from "../flash-invaders";
 import MongoDBService from "../mongodb";
@@ -49,13 +48,5 @@ export class StoreFlashesCron extends CronTask {
     } finally {
       await mongo.disconnect();
     }
-  }
-
-  public register(): void {
-    console.log(`Registering ${this.name} cron job`);
-
-    cron.schedule(this.schedule, async () => {
-      await this.task();
-    });
   }
 }
