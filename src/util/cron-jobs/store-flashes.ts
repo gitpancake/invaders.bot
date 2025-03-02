@@ -22,6 +22,11 @@ export class StoreFlashesCron extends CronTask {
 
     const flattened = [...flashes.with_paris, ...flashes.without_paris];
 
+    if (flattened.length === 0) {
+      console.log("No flashes found.");
+      return;
+    }
+
     const prepared: InvaderFlash[] = flattened.map((flash) => ({
       imageUrl: `${invaderApi.API_URL}${flash.img}`,
       key: flash.img,
@@ -37,7 +42,7 @@ export class StoreFlashesCron extends CronTask {
       const writtenDocuments = await mongo.writeMany(flattened);
 
       if (uploadCount > 0 || writtenDocuments > 0) {
-        console.log(`Found ${flattened.length} flashes. Stored ${uploadCount} new images. Wrote ${writtenDocuments} new documents. ${format(new Date(), "yyyy-MM-dd HH:mm:ss")}`);
+        console.log(`${flattened.length} flashes. ${uploadCount} new images. ${writtenDocuments} new documents. ${format(new Date(), "yyyy-MM-dd HH:mm:ss")}`);
       }
     } catch (error) {
       console.error("Error storing flashes:", error);
