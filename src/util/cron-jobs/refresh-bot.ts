@@ -1,4 +1,5 @@
 import { InvadersFunHandler } from "../invaders.fun";
+import { formattedCurrentTime } from "../times";
 import { CronTask } from "./base";
 
 export class ChannelRefresher extends CronTask {
@@ -8,6 +9,7 @@ export class ChannelRefresher extends CronTask {
 
   public async task(): Promise<void> {
     try {
+      console.log(`Refreshing channel cache. ${formattedCurrentTime}`);
       await new InvadersFunHandler().refreshCache();
     } catch (error) {}
   }
