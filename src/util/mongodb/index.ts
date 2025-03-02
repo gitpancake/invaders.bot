@@ -1,6 +1,6 @@
 import { config } from "dotenv";
-import { Collection, Db, MongoClient } from "mongodb";
-import { Flash } from "../invaders/types";
+import { Collection, Db, Filter, FindOptions, MongoBulkWriteError, MongoClient } from "mongodb";
+import { Flash } from "../flash-invaders/types";
 
 config({ path: ".env" });
 
@@ -9,14 +9,17 @@ class MongoDBService {
   private db: Db | null = null;
   private collection: Collection<Flash> | null = null;
   private dbName: string = "invaders";
+  private collectionName: string;
 
-  constructor(private collectionName: string) {
+  constructor(collectionName: string) {
     const mongoUri = process.env.MONGO_URI;
 
     if (!mongoUri) {
       throw new Error("MONGO_URI is not defined in the environment variables");
     }
+
     this.client = new MongoClient(mongoUri);
+    this.collectionName = collectionName;
   }
 
   // Connect to the database
@@ -34,91 +37,58 @@ class MongoDBService {
     }
   }
 
-  // Read documents from the collection
-  public async readDocuments(filter: Partial<Flash> = {}): Promise<Flash[]> {
-    if (!this.collection) {
-      throw new Error("Not connected to the database");
-    }
+  public async disconnect(): Promise<void> {
     try {
-      return await this.collection.find(filter).toArray();
+      await this.client.close();
     } catch (error) {
-      console.error("Error reading documents:", error);
+      console.error("Error disconnecting from MongoDB:", error);
       throw error;
     }
   }
 
-  public async getRandomDocument(filter: Partial<Flash> = {}): Promise<Flash> {
+  public async getRandomDocument(query: Filter<Flash> = {}, options: FindOptions = {}): Promise<Flash | null> {
     if (!this.collection) {
       throw new Error("Not connected to the database");
     }
-    try {
-      const count = await this.collection.countDocuments(filter);
-      const randomIndex = Math.floor(Math.random() * count);
-      const flash = await this.collection.find(filter).limit(1).skip(randomIndex).next();
 
-      if (!flash) {
-        return await this.getRandomDocument(filter);
+    try {
+      const count = await this.collection.countDocuments(query);
+
+      if (count === 0) {
+        throw new Error("No documents found.");
       }
 
-      return flash;
-    } catch (error) {
-      console.error("Error reading documents:", error);
-      throw error;
-    }
-  }
+      const randomIndex = Math.floor(Math.random() * count);
 
-  public async getMultipleByFlashId(flashIds: number[]): Promise<Flash[]> {
-    if (!this.collection) {
-      throw new Error("Not connected to the database");
-    }
-    try {
-      return await this.collection.find<Flash>({ flash_id: { $in: flashIds } }).toArray();
+      const document = await this.collection.find(query, options).skip(randomIndex).limit(1).next();
+
+      return document;
     } catch (error) {
-      console.error("Error reading documents:", error);
+      console.error("Error retrieving a random document:", error);
       throw error;
     }
   }
 
   // Write a document to the collection
-  public async writeMany(flashes: Flash[]): Promise<void> {
+  public async writeMany(flashes: Flash[]): Promise<number> {
     if (!this.collection) {
       throw new Error("Not connected to the database");
     }
 
     try {
-      // Use `ordered: false` to continue inserting other documents even if some fail due to duplication
-      await this.collection.insertMany(flashes, { ordered: false });
-    } catch (error: any) {
-      if (error.code === 11000) {
-        // Duplicate key error (MongoDB error code for unique constraint violation)
-        // console.warn("Some flashes were not inserted due to duplicate flash_id values.");
-      } else {
-        console.error("Error writing documents:", error);
-        throw error;
+      const result = await this.collection.insertMany(flashes, { ordered: false });
+
+      return result.insertedCount;
+    } catch (error: unknown) {
+      if (error instanceof MongoBulkWriteError) {
+        if (error.code !== 11000) {
+          console.error("Error writing documents:", error);
+        }
+
+        return error.result.insertedCount;
       }
-    }
-  }
 
-  public async writeOne(flash: Flash): Promise<void> {
-    if (!this.collection) {
-      throw new Error("Not connected to the database");
-    }
-    try {
-      await this.collection.insertOne(flash);
-    } catch (error) {
-      console.error("Error writing document:", error);
-      throw error;
-    }
-  }
-
-  // Disconnect from the database
-  public async disconnect(): Promise<void> {
-    try {
-      await this.client.close();
-      // console.log("Disconnected from MongoDB");
-    } catch (error) {
-      console.error("Error disconnecting from MongoDB:", error);
-      throw error;
+      return 0;
     }
   }
 
@@ -134,22 +104,6 @@ class MongoDBService {
       // console.log("Document updated successfully");
     } catch (error) {
       console.error("Error updating document:", error);
-      throw error;
-    }
-  }
-
-  public async updateManyDocuments(filter: Partial<Flash>, update: Partial<Flash>): Promise<void> {
-    if (!this.collection) {
-      throw new Error("Not connected to the database");
-    }
-    try {
-      const result = await this.collection.updateMany(filter, { $set: update });
-      if (result.matchedCount === 0) {
-        throw new Error("No documents found matching the filter criteria");
-      }
-      // console.log("Documents updated successfully");
-    } catch (error) {
-      console.error("Error updating documents:", error);
       throw error;
     }
   }

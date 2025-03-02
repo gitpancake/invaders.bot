@@ -1,17 +1,12 @@
 import { config } from "dotenv";
-import cron from "node-cron";
-import Coordinator from "./util/coordinator";
+import { PostRandomFlashCron } from "./util/cron-jobs/post-flashes";
+import { ChannelRefresher } from "./util/cron-jobs/refresh-bot";
+import { StoreFlashesCron } from "./util/cron-jobs/store-flashes";
 
 config({ path: ".env" });
 
-cron.schedule("*/5 * * * *", async () => {
-  await new Coordinator().fetchFlashes(["Los Angeles", "New York", "Miami", "San Diego"]).catch((err) => {
-    console.error(err);
-  });
-});
+new PostRandomFlashCron("*/5 * * * *").register();
 
-cron.schedule("*/15 * * * *", async () => {
-  await new Coordinator().fetchFlashes().catch((err) => {
-    console.error(err);
-  });
-});
+new StoreFlashesCron("*/1 * * * *").register();
+
+new ChannelRefresher("* */1 * * *").register();
