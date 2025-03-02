@@ -1,3 +1,4 @@
+import { format } from "date-fns";
 import cron from "node-cron";
 import { InvaderFlash, InvaderFlashCache } from "../cache";
 import SpaceInvadersAPI from "../flash-invaders";
@@ -29,17 +30,15 @@ export class StoreFlashesCron extends CronTask {
     const mongo = new MongoDBService("flashes");
 
     try {
-      console.log(`Preparing to store ${flattened.length} flashes`);
-
       const uploadCount = await new InvaderFlashCache().batchUpload(prepared, 45);
-
-      console.log(`Uploaded ${uploadCount} new images`);
 
       await mongo.connect();
 
       const writtenDocuments = await mongo.writeMany(flattened);
 
-      console.log(`Wrote ${writtenDocuments} new documents`);
+      if (uploadCount > 0 || writtenDocuments > 0) {
+        console.log(`Found ${flattened.length} flashes. Stored ${uploadCount} new images. Wrote ${writtenDocuments} new documents. ${format(new Date(), "yyyy-MM-dd HH:mm:ss")}`);
+      }
     } catch (error) {
       console.error("Error storing flashes:", error);
     } finally {
