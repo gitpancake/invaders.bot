@@ -9,4 +9,4 @@ new PostRandomFlashCron("*/10 * * * *").register();
 
 new StoreFlashesCron("*/5 * * * *").register();
 
-new ChannelRefresher("* */1 * * *").register();
+new ChannelRefresher("*/59 * * * *").register();
