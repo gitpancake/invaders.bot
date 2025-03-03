@@ -11,9 +11,11 @@ export class FlashesDb extends Mongo<Flash> {
   }
 
   public async onConnect(): Promise<void> {
-    await this.execute(async (collection) => {
-      await collection.createIndex({ flash_id: 1 }, { unique: true });
-    });
+    if (!this.collection) {
+      throw new Error("Collection is not initialized");
+    }
+
+    await this.collection.createIndex({ flash_id: 1 }, { unique: true });
   }
 
   public async getRandomDocument(query: Filter<Flash> = {}): Promise<Flash | null> {

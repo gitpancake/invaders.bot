@@ -11,18 +11,17 @@ export abstract class Mongo<T extends Document> {
     }
 
     this.client = new MongoClient(process.env.MONGO_URI);
-
     this.collection = this.client.db(dbName).collection<T>(collectionName);
   }
 
   public async onConnect(): Promise<void> {}
 
   protected async execute<R>(operation: (collection: Collection<T>) => Promise<R>): Promise<R> {
-    await this.client.connect();
-
-    await this.onConnect();
-
     try {
+      await this.client.connect();
+
+      await this.onConnect();
+
       return await operation(this.collection);
     } catch (error) {
       console.error("Database operation error:", error);
