@@ -23,6 +23,10 @@ export abstract class CronTask {
   public abstract task(): Promise<void>;
 
   public register(): void {
+    this.onRegister();
+  }
+
+  protected onRegister(): void {
     if (!this.schedule || !cron.validate(this.schedule)) {
       console.error(`No schedule found for cron task: ${this.name}`);
       return;
