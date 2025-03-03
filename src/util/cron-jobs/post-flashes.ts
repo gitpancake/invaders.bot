@@ -10,10 +10,10 @@ export class PostRandomFlashCron extends CronTask {
   }
 
   public async task(): Promise<void> {
-    const minutes = 30;
+    const hours = 1;
 
     try {
-      const time_threshold = getUnixTime(sub(new Date(), { minutes }));
+      const time_threshold = getUnixTime(sub(new Date(), { hours }));
 
       const randomFlash = await new FlashesDb().getRandomDocument({
         $or: [{ posted: true }, { posted: { $exists: false } }],
@@ -21,7 +21,7 @@ export class PostRandomFlashCron extends CronTask {
       });
 
       if (!randomFlash) {
-        console.error(`No unposted flashes in last ${minutes} min. ${formattedCurrentTime()}`);
+        console.error(`No unposted flashes in last ${hours} hrs. ${formattedCurrentTime()}`);
         return;
       }
 
