@@ -9,7 +9,7 @@ export class ChannelRefresher extends CronTask {
 
   public async task(): Promise<void> {
     try {
-      console.log(`Refreshing channel cache. ${formattedCurrentTime}`);
+      console.log(`Refreshing channel casts. ${formattedCurrentTime()}`);
       await new InvadersFunHandler().refreshCache();
     } catch (error) {}
   }
