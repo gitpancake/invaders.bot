@@ -1,6 +1,7 @@
 import { InvaderFlashCache } from "../cache";
 import SpaceInvadersAPI from "../flash-invaders";
 import { FlashesDb } from "../mongodb/flashes";
+import { PostPersonalFlash } from "../tasks/post-personal";
 import { formattedCurrentTime } from "../times";
 import { CronTask } from "./base";
 
@@ -31,6 +32,12 @@ export class StoreFlashesCron extends CronTask {
       );
 
       const writtenDocuments = await new FlashesDb().writeMany(flattened);
+
+      const personalFlashes = flattened.filter((flash) => flash.player === "WORLDY");
+
+      for (const flash of personalFlashes) {
+        await new PostPersonalFlash().handle(flash);
+      }
 
       if (uploadCount > 0 || writtenDocuments > 0) {
         console.log(`${flattened.length} flashes. ${uploadCount} new images. ${writtenDocuments} new documents. ${formattedCurrentTime()}`);

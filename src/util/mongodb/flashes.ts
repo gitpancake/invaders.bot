@@ -25,6 +25,12 @@ export class FlashesDb extends Mongo<Flash> {
     });
   }
 
+  public async getRecentFlashes(limit: number): Promise<Flash[]> {
+    return this.execute(async (collection) => {
+      return await collection.find({}).sort({ timestamp: -1 }).limit(limit).toArray();
+    });
+  }
+
   public async writeMany(flashes: Flash[]): Promise<number> {
     return this.execute(async (collection) => {
       try {
