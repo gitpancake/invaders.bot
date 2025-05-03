@@ -18,6 +18,13 @@ export class FlashesDb extends Mongo<Flash> {
     await this.collection.createIndex({ flash_id: 1 }, { unique: true });
   }
 
+  public async getDocument(filter: Partial<Flash>): Promise<Flash | null> {
+    return this.execute(async (collection) => {
+      const result = await collection.findOne(filter);
+      return result || null;
+    });
+  }
+
   public async getRandomDocument(query: Filter<Flash> = {}): Promise<Flash | null> {
     return this.execute(async (collection) => {
       const result = await collection.aggregate<Flash>([{ $match: query }, { $sample: { size: 1 } }]).toArray();

@@ -6,9 +6,19 @@ import { formattedCurrentTime } from "../times";
 export class PostPersonalFlash {
   public async handle(flash: Flash): Promise<void> {
     try {
+      const db = new FlashesDb();
+
+      const existingFlash = await db.getDocument({
+        flash_id: flash.flash_id,
+      });
+
+      if (existingFlash?.posted) {
+        return;
+      }
+
       await new InvadersFunHandler().sendToPersonal(flash);
 
-      await new FlashesDb().updateDocument(
+      await db.updateDocument(
         {
           flash_id: flash.flash_id,
         },
