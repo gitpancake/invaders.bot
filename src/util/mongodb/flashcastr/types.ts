@@ -4,4 +4,5 @@ import { Flash } from "../../flash-invaders/types";
 export interface Flashcastr {
   flash: Flash;
   user: NeynarUser;
+  castHash: string | null;
 }

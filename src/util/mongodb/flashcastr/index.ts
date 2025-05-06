@@ -1,4 +1,4 @@
-import { MongoBulkWriteError } from "mongodb";
+import { Filter, MongoBulkWriteError } from "mongodb";
 import { Mongo } from "../connector";
 import { Flashcastr } from "./types";
 
@@ -13,6 +13,12 @@ export class FlashcastrFlashesDb extends Mongo<Flashcastr> {
   public async onConnect(): Promise<void> {
     await this.collection.createIndex({ "user.fid": -1 });
     await this.collection.createIndex({ "flash.flash_id": 1 }, { unique: true });
+  }
+
+  public async getMany(query: Filter<Flashcastr>): Promise<Flashcastr[]> {
+    return this.execute(async (collection) => {
+      return collection.find(query).toArray();
+    });
   }
 
   public async insertMany(flashes: Flashcastr[]): Promise<number> {

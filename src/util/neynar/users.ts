@@ -10,12 +10,14 @@ export class Users extends Neynar {
     return (await this.client.fetchBulkUsers({ fids })).users;
   }
 
-  public async publishCast({ signerUuid, msg, embeds, channelId }: { signerUuid: string; msg: string; embeds: any[]; channelId?: string }): Promise<void> {
-    await this.client.publishCast({
+  public async publishCast({ signerUuid, msg, embeds, channelId }: { signerUuid: string; msg: string; embeds: any[]; channelId?: string }): Promise<string> {
+    const cast = await this.client.publishCast({
       signerUuid,
       text: msg,
       embeds,
       channelId,
     });
+
+    return cast.cast.hash;
   }
 }

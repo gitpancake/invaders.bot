@@ -16,80 +16,78 @@ export class FlashSyncCron extends CronTask {
 
   public async task(): Promise<void> {
     try {
-      // Get all registered users
-      const usersDb = new FlashcastrUsersDb();
-      const users = await usersDb.getMany({});
+      /* ------------------------------------------------------------------ */
+      /* 1.  Fetch registered users                                         */
+      /* ------------------------------------------------------------------ */
+      const users = await new FlashcastrUsersDb().getMany({});
+      if (!users.length) return;
 
-      if (users.length === 0) {
-        return; // No users to process
-      }
+      const usersByUsername = new Map(users.map((u) => [u.username, u]));
 
-      // Get unique fids and fetch corresponding Neynar users
-      const uniqueFids = Array.from(new Set(users.map((user) => user.fid)));
-      const neynarUsers = await new Users().getUsersByFids(uniqueFids);
-
-      // Create lookup map for faster user matching
-      const neynarUserMap = new Map(neynarUsers.map((user) => [user.fid, user]));
-
-      const flashesDb = new FlashesDb();
-      const flashes = await flashesDb.getMany({
-        timestamp: {
-          $gte: getUnixTime(Date.now() - this.flashTimespanMins * 60 * 1000),
-        },
-        player: {
-          $in: users.map((user) => user.username),
-        },
+      /* ------------------------------------------------------------------ */
+      /* 2.  Fetch flashes from the last N minutes                          */
+      /* ------------------------------------------------------------------ */
+      const sinceUnix = getUnixTime(new Date(Date.now() - this.flashTimespanMins * 60_000));
+      const flashes = await new FlashesDb().getMany({
+        timestamp: { $gte: sinceUnix }, // use $gte, not $lte
+        player: { $in: [...usersByUsername.keys()] },
       });
+      if (!flashes.length) return;
 
-      if (flashes.length === 0) {
-        return; // No flashes to process
-      }
+      /* ------------------------------------------------------------------ */
+      /* 3.  Remove flashes we already processed                            */
+      /* ------------------------------------------------------------------ */
+      const flashIds = flashes.map((f) => f.flash_id);
+      const flashcastrFlashesDb = new FlashcastrFlashesDb();
+      const alreadyStored = await flashcastrFlashesDb.getMany({ "flash.flash_id": { $in: flashIds } });
+      const newFlashes = flashes.filter((f) => !alreadyStored.some((e) => e.flash.flash_id === f.flash_id));
+      if (!newFlashes.length) return;
 
-      // Create array to store auto-cast promises
-      const autoCastPromises: Promise<void>[] = [];
+      /* ------------------------------------------------------------------ */
+      /* 4.  Fetch Neynar profiles (dedup with Set for speed)               */
+      /* ------------------------------------------------------------------ */
+      const uniqueFids = [...new Set(users.map((u) => u.fid))];
+      const neynarUsers = await new Users().getUsersByFids(uniqueFids);
+      const neynarByFid = new Map(neynarUsers.map((u) => [u.fid, u]));
 
-      // Process flashes and prepare auto-casts
-      const flashcastrFlashes: Flashcastr[] = flashes.map((flash) => {
-        const user = users.find((user) => user.username === flash.player);
-        if (!user) {
-          throw new Error(`User not found for flash: ${flash.flash_id}`);
-        }
+      /* ------------------------------------------------------------------ */
+      /* 5.  Build flash-documents & optionally publish auto-casts          */
+      /* ------------------------------------------------------------------ */
+      const publisher = new Users(); // reuse 1 instance
+      const docs: Flashcastr[] = [];
 
-        // Queue up auto-cast if enabled for user
-        if (user.auto_cast) {
-          // Each publishCast creates a new Users instance and fires request immediately
-          autoCastPromises.push(
-            new Users().publishCast({
-              signerUuid: user.signer_uuid,
+      for (const flash of newFlashes) {
+        const appUser = usersByUsername.get(flash.player);
+        if (!appUser) continue; // should not happen
+
+        const neynarUsr = neynarByFid.get(appUser.fid);
+        if (!neynarUsr) continue;
+
+        let castHash: string | null = null;
+        if (appUser.auto_cast) {
+          try {
+            castHash = await publisher.publishCast({
+              signerUuid: appUser.signer_uuid,
               msg: `I just flashed an Invader in ${flash.city}! 👾`,
               embeds: [{ url: `${process.env.S3_URL}${flash.img}` }],
               channelId: "invaders",
-            })
-          );
+            });
+          } catch (err) {
+            console.error("Failed to auto-cast:", err);
+          }
         }
 
-        const neynarUser = neynarUserMap.get(user.fid);
-        if (!neynarUser) {
-          throw new Error(`Neynar user not found for flash: ${flash.flash_id}`);
-        }
-
-        return {
-          flash,
-          user: neynarUser,
-        };
-      });
-
-      // Store processed flashes
-      if (flashcastrFlashes.length > 0) {
-        await new FlashcastrFlashesDb().insertMany(flashcastrFlashes);
+        docs.push({ flash, user: neynarUsr, castHash });
       }
 
-      // Wait for all auto-casts to complete
-      await Promise.all(autoCastPromises);
+      /* ------------------------------------------------------------------ */
+      /* 6.  Persist & log                                                  */
+      /* ------------------------------------------------------------------ */
+      if (docs.length) await flashcastrFlashesDb.insertMany(docs);
 
-      console.log(`${flashcastrFlashes.length} flashes. ${autoCastPromises.length} auto-casts. ${formattedCurrentTime()}`);
+      console.log(`${docs.length} flashes processed, ` + `${docs.filter((d) => d.castHash).length} auto-casts. ` + formattedCurrentTime());
     } catch (error) {
-      console.error("Error storing flashcastr flashes:", error);
+      console.error("flash-sync cron failed:", error);
     }
   }
 }
