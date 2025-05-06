@@ -1,7 +1,7 @@
 import { User } from "@neynar/nodejs-sdk/build/api";
 import { Neynar } from "./base";
 
-export class Users extends Neynar {
+export class NeynarUsers extends Neynar {
   constructor() {
     super();
   }

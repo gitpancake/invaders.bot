@@ -32,17 +32,6 @@ export class InvadersFunHandler {
     }
   }
 
-  public async sendToPersonal(flash: Flash): Promise<void> {
-    try {
-      await this.instance.post("/api/personal", {
-        flash,
-      });
-    } catch (error) {
-      console.error(`Error posting flash to personal ${flash.flash_id}:`, error);
-      throw error;
-    }
-  }
-
   public async refreshCache(): Promise<void> {
     try {
       await this.instance.post(`/api/refresh`);

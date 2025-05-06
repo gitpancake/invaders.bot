@@ -3,7 +3,7 @@ import { FlashcastrFlashesDb } from "../mongodb/flashcastr";
 import { Flashcastr } from "../mongodb/flashcastr/types";
 import { FlashesDb } from "../mongodb/flashes";
 import { FlashcastrUsersDb } from "../mongodb/users";
-import { Users } from "../neynar/users";
+import { NeynarUsers } from "../neynar/users";
 import { formattedCurrentTime } from "../times";
 import { CronTask } from "./base";
 
@@ -47,13 +47,13 @@ export class FlashSyncCron extends CronTask {
       /* 4.  Fetch Neynar profiles (dedup with Set for speed)               */
       /* ------------------------------------------------------------------ */
       const uniqueFids = [...new Set(users.map((u) => u.fid))];
-      const neynarUsers = await new Users().getUsersByFids(uniqueFids);
+      const neynarUsers = await new NeynarUsers().getUsersByFids(uniqueFids);
       const neynarByFid = new Map(neynarUsers.map((u) => [u.fid, u]));
 
       /* ------------------------------------------------------------------ */
       /* 5.  Build flash-documents & optionally publish auto-casts          */
       /* ------------------------------------------------------------------ */
-      const publisher = new Users(); // reuse 1 instance
+      const publisher = new NeynarUsers(); // reuse 1 instance
       const docs: Flashcastr[] = [];
 
       for (const flash of newFlashes) {
