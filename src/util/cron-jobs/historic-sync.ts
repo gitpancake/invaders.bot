@@ -32,6 +32,8 @@ export class HistoricFlashSyncCron extends CronTask {
         for (const flash of flashes) {
           docs.push({ flash, user: neynarUsr, castHash: null });
         }
+
+        await new FlashcastrUsersDb().updateDocument({ fid: appUser.fid }, { $set: { historic_sync: false } });
       }
 
       if (docs.length) await new FlashcastrFlashesDb().insertMany(docs);
