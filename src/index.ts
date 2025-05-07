@@ -1,6 +1,5 @@
 import { config } from "dotenv";
 import { FlashSyncCron } from "./util/cron-jobs/flash-sync";
-import { HistoricFlashSyncCron } from "./util/cron-jobs/historic-sync";
 import { ChannelRefresher } from "./util/cron-jobs/refresh-bot";
 import { StoreFlashesCron } from "./util/cron-jobs/store-flashes";
 
@@ -11,5 +10,3 @@ new StoreFlashesCron("*/5 * * * *").register();
 new ChannelRefresher("*/59 * * * *").register();
 
 new FlashSyncCron("*/5 * * * *").register();
-
-new HistoricFlashSyncCron("*/5 * * * *").register();

@@ -1,4 +1,6 @@
 import { getUnixTime } from "date-fns";
+import { config } from "dotenv";
+import { decrypt } from "../encrypt";
 import { FlashcastrFlashesDb } from "../mongodb/flashcastr";
 import { Flashcastr } from "../mongodb/flashcastr/types";
 import { FlashesDb } from "../mongodb/flashes";
@@ -6,6 +8,8 @@ import { FlashcastrUsersDb } from "../mongodb/users";
 import { NeynarUsers } from "../neynar/users";
 import { formattedCurrentTime } from "../times";
 import { CronTask } from "./base";
+
+config({ path: ".env" });
 
 export class FlashSyncCron extends CronTask {
   private flashTimespanMins = 5;
@@ -66,8 +70,12 @@ export class FlashSyncCron extends CronTask {
         let castHash: string | null = null;
         if (appUser.auto_cast) {
           try {
+            const decryptionKey = process.env.SIGNER_ENCRYPTION_KEY;
+
+            if (!decryptionKey) throw new Error("SIGNER_ENCRYPTION_KEY is not defined");
+
             castHash = await publisher.publishCast({
-              signerUuid: appUser.signer_uuid,
+              signerUuid: decrypt(appUser.signer_uuid, decryptionKey),
               msg: `I just flashed an Invader in ${flash.city}! 👾`,
               embeds: [{ url: `${process.env.S3_URL}${flash.img}` }],
               channelId: "invaders",
