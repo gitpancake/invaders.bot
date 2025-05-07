@@ -12,7 +12,7 @@ import { CronTask } from "./base";
 config({ path: ".env" });
 
 export class FlashSyncCron extends CronTask {
-  private flashTimespanMins = 5;
+  private flashTimespanMins = 30;
 
   constructor(schedule: string) {
     super("flash-sync", schedule);
@@ -34,7 +34,7 @@ export class FlashSyncCron extends CronTask {
       const sinceUnix = getUnixTime(new Date(Date.now() - this.flashTimespanMins * 60_000));
       const flashes = await new FlashesDb().getMany({
         timestamp: { $gte: sinceUnix }, // use $gte, not $lte
-        player: { $in: [...usersByUsername.keys()] },
+        player: { $in: [...usersByUsername.keys()].map((username) => new RegExp(`^${username}$`, "i")) },
       });
       if (!flashes.length) return;
 
@@ -61,7 +61,7 @@ export class FlashSyncCron extends CronTask {
       const docs: Flashcastr[] = [];
 
       for (const flash of newFlashes) {
-        const appUser = usersByUsername.get(flash.player);
+        const appUser = [...usersByUsername.entries()].find(([username]) => username.toLowerCase() === flash.player.toLowerCase())?.[1];
         if (!appUser) continue; // should not happen
 
         const neynarUsr = neynarByFid.get(appUser.fid);

@@ -9,4 +9,4 @@ new StoreFlashesCron("*/5 * * * *").register();
 
 new ChannelRefresher("*/59 * * * *").register();
 
-new FlashSyncCron("*/5 * * * *").register();
+new FlashSyncCron("*/1 * * * *").register();
