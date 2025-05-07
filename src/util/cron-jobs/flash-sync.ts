@@ -12,7 +12,7 @@ import { CronTask } from "./base";
 config({ path: ".env" });
 
 export class FlashSyncCron extends CronTask {
-  private flashTimespanMins = 30;
+  private flashTimespanMins = 5;
 
   constructor(schedule: string) {
     super("flash-sync", schedule);
