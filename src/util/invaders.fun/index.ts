@@ -31,13 +31,4 @@ export class InvadersFunHandler {
       throw error;
     }
   }
-
-  public async refreshCache(): Promise<void> {
-    try {
-      await this.instance.post(`/api/refresh`);
-    } catch (error) {
-      console.error(`Error refreshing cast cache:`, error);
-      throw error;
-    }
-  }
 }
