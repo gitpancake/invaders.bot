@@ -22,16 +22,20 @@ export class StoreFlashesCron extends CronTask {
     const flattened = [...flashes.with_paris, ...flashes.without_paris];
 
     try {
-      const uploadCount = await new InvaderFlashCache().batchUpload(
-        flattened.map((flash) => ({
-          imageUrl: `${invaderApi.API_URL}${flash.img}`,
-          key: flash.img,
-        }))
-      );
-
       const writtenDocuments = await new FlashesDb().writeMany(flattened);
 
-      if (uploadCount > 0 || writtenDocuments > 0) {
+      const uploadCount = await new InvaderFlashCache().batchUpload(
+        flattened
+          .filter((flash) => {
+            return writtenDocuments.some((doc) => doc.flash_id === flash.flash_id);
+          })
+          .map((flash) => ({
+            imageUrl: `${invaderApi.API_URL}${flash.img}`,
+            key: flash.img,
+          }))
+      );
+
+      if (uploadCount > 0 || writtenDocuments.length > 0) {
         console.log(`${flattened.length} flashes. ${uploadCount} new images. ${writtenDocuments} new documents. ${formattedCurrentTime()}`);
       }
     } catch (error) {

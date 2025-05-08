@@ -42,19 +42,20 @@ export class FlashesDb extends Mongo<Flash> {
     });
   }
 
-  public async writeMany(flashes: Flash[]): Promise<number> {
+  public async writeMany(flashes: Flash[]): Promise<Flash[]> {
     return this.execute(async (collection) => {
       try {
         const result = await collection.insertMany(flashes, { ordered: false });
-        return result.insertedCount;
+        return flashes.filter((_, index) => result.insertedIds[index] !== undefined);
       } catch (error: unknown) {
         if (error instanceof MongoBulkWriteError) {
           if (error.code !== 11000) {
             console.error("Error writing documents:", error);
           }
-          return error.result.insertedCount ?? 0;
+          // Return only the successfully inserted documents
+          return flashes.filter((_, index) => error.result.insertedIds[index] !== undefined);
         }
-        return 0;
+        return [];
       }
     });
   }
