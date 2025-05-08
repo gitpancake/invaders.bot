@@ -43,6 +43,7 @@ export class InvaderFlashCache {
         }
       );
 
+      console.log({ resp });
       if (resp.status === 201) return 1;
 
       return 0;
