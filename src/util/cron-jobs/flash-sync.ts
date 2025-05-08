@@ -1,10 +1,10 @@
 import { getUnixTime } from "date-fns";
 import { config } from "dotenv";
 import { decrypt } from "../encrypt";
-import { FlashcastrFlashesDb } from "../mongodb/flashcastr";
-import { Flashcastr } from "../mongodb/flashcastr/types";
-import { FlashesDb } from "../mongodb/flashes";
-import { FlashcastrUsersDb } from "../mongodb/users";
+import { FlashcastrFlashesDb } from "../mongodb/flashcastr-flashes";
+import { Flashcastr } from "../mongodb/flashcastr-flashes/types";
+import { FlashcastrUsersDb } from "../mongodb/flashcastr-users";
+import { FlashesDb } from "../mongodb/invader-flashes";
 import { NeynarUsers } from "../neynar/users";
 import { formattedCurrentTime } from "../times";
 import { CronTask } from "./base";

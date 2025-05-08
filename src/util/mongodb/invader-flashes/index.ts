@@ -1,6 +1,6 @@
 import { Filter, MongoBulkWriteError } from "mongodb";
-import { Flash } from "../flash-invaders/types";
-import { Mongo } from "./connector";
+import { Mongo } from "../connector";
+import { Flash } from "./types";
 
 export class FlashesDb extends Mongo<Flash> {
   constructor() {
@@ -18,28 +18,8 @@ export class FlashesDb extends Mongo<Flash> {
     await this.collection.createIndex({ flash_id: 1 }, { unique: true });
   }
 
-  public async getDocument(filter: Partial<Flash>): Promise<Flash | null> {
-    return this.execute(async (collection) => {
-      const result = await collection.findOne(filter);
-      return result || null;
-    });
-  }
-
-  public async getRandomDocument(query: Filter<Flash> = {}): Promise<Flash | null> {
-    return this.execute(async (collection) => {
-      const result = await collection.aggregate<Flash>([{ $match: query }, { $sample: { size: 1 } }]).toArray();
-      return result[0] || null;
-    });
-  }
-
   public async getMany(filter: Filter<Flash>): Promise<Flash[]> {
     return this.execute(async (collection) => await collection.find(filter).toArray());
-  }
-
-  public async getRecentFlashes(limit: number): Promise<Flash[]> {
-    return this.execute(async (collection) => {
-      return await collection.find({}).sort({ timestamp: -1 }).limit(limit).toArray();
-    });
   }
 
   public async writeMany(flashes: Flash[]): Promise<Flash[]> {
@@ -56,15 +36,6 @@ export class FlashesDb extends Mongo<Flash> {
           return flashes.filter((_, index) => error.result.insertedIds[index] !== undefined);
         }
         return [];
-      }
-    });
-  }
-
-  public async updateDocument(filter: Partial<Flash>, update: Partial<Flash>): Promise<void> {
-    return this.execute(async (collection) => {
-      const result = await collection.updateOne(filter, { $set: update });
-      if (result.matchedCount === 0) {
-        throw new Error("No document found matching the filter criteria");
       }
     });
   }

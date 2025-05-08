@@ -1,6 +1,6 @@
-import { InvaderFlashCache } from "../cache";
 import SpaceInvadersAPI from "../flash-invaders";
-import { FlashesDb } from "../mongodb/flashes";
+import { InvaderFlashCache } from "../image-sync";
+import { FlashesDb } from "../mongodb/invader-flashes";
 import { formattedCurrentTime } from "../times";
 import { CronTask } from "./base";
 
