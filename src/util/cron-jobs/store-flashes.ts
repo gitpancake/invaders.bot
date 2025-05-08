@@ -26,8 +26,7 @@ export class StoreFlashesCron extends CronTask {
         flattened.map((flash) => ({
           imageUrl: `${invaderApi.API_URL}${flash.img}`,
           key: flash.img,
-        })),
-        45
+        }))
       );
 
       const writtenDocuments = await new FlashesDb().writeMany(flattened);

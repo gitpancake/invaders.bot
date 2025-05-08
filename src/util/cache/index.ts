@@ -1,6 +1,4 @@
-import { batchRequests } from "../batcher";
-import { ImageDownloader } from "../images";
-import { S3Service } from "../s3";
+import axios, { AxiosError } from "axios";
 
 export interface InvaderFlash {
   imageUrl: string;
@@ -8,52 +6,63 @@ export interface InvaderFlash {
 }
 
 export class InvaderFlashCache {
-  private S3_SERVICE: S3Service;
-  private IMAGE_DOWNLOADER: ImageDownloader;
+  private IMAGE_UPLOAD_URL: string;
+  private LAMBDA_API_KEY: string;
 
   constructor() {
-    if (!process.env.S3_BUCKET_NAME) {
-      throw new Error("Missing S3_BUCKET_NAME in .env file.");
+    if (!process.env.IMAGE_UPLOAD_URL || !process.env.LAMBDA_API_KEY) {
+      throw new Error("IMAGE_UPLOAD_URL and LAMBDA_API_KEY must be set");
     }
 
-    this.S3_SERVICE = new S3Service({
-      BUCKET_NAME: process.env.S3_BUCKET_NAME,
-    });
-
-    this.IMAGE_DOWNLOADER = new ImageDownloader();
+    this.IMAGE_UPLOAD_URL = process.env.IMAGE_UPLOAD_URL;
+    this.LAMBDA_API_KEY = process.env.LAMBDA_API_KEY;
   }
 
   private async upload(request: InvaderFlash): Promise<number> {
-    const { imageUrl, key } = request;
+    try {
+      // Step 1: Download the image to a buffer
+      const response = await axios.get<ArrayBuffer>(request.imageUrl, {
+        responseType: "arraybuffer",
+      });
 
-    const exists = await this.S3_SERVICE.objectExists(key);
+      const base64Buffer = Buffer.from(response.data).toString("base64");
 
-    if (exists) {
+      // Step 2: Send base64 + key to Lambda
+      const resp = await axios.post(
+        `${this.IMAGE_UPLOAD_URL}/upload`,
+        {
+          body: {
+            buffer: base64Buffer,
+            key: request.key,
+          },
+        },
+        {
+          headers: {
+            "x-api-key": this.LAMBDA_API_KEY, // Replace with your real key
+          },
+        }
+      );
+
+      if (resp.status === 201) return 1;
+
+      return 0;
+    } catch (ex) {
+      if (ex instanceof AxiosError) {
+        console.error("Upload failed:", ex.response?.data || ex.message || ex);
+      } else {
+        console.error("Upload failed:", ex);
+      }
       return 0;
     }
-
-    const { buffer, contentType } = await this.IMAGE_DOWNLOADER.downloadImage(imageUrl);
-
-    const uploaded = await this.S3_SERVICE.putBufferObject(buffer, contentType, key);
-
-    if (!uploaded) {
-      throw new Error("Failed to upload image to S3");
-    }
-
-    return 1;
   }
 
-  public async batchUpload(requests: InvaderFlash[], batchSize: number = 45): Promise<number> {
+  public async batchUpload(requests: InvaderFlash[]): Promise<number> {
     try {
-      const batches = batchRequests(requests, batchSize);
-
       let count = 0;
 
-      for (const batch of batches) {
-        const result = await Promise.all(batch.map((request) => this.upload(request)));
+      const result = await Promise.all(requests.map((request) => this.upload(request)));
 
-        count += result.reduce((total, count) => total + count, 0);
-      }
+      count += result.reduce((total, count) => total + count, 0);
 
       return count;
     } catch (error) {

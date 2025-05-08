@@ -26,7 +26,6 @@
     "typescript": "^5.7.2"
   },
   "dependencies": {
-    "@aws-sdk/client-s3": "^3.717.0",
     "@farcaster/hub-nodejs": "^0.12.7",
     "@neynar/nodejs-sdk": "^2.33.1",
     "@smithy/node-http-handler": "^4.0.3",
