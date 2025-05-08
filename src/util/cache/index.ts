@@ -58,13 +58,11 @@ export class InvaderFlashCache {
 
   public async batchUpload(requests: InvaderFlash[]): Promise<number> {
     try {
-      let count = 0;
-
       const result = await Promise.all(requests.map((request) => this.upload(request)));
 
-      count += result.reduce((total, count) => total + count, 0);
+      console.log(`Uploaded ${result.length} images`);
 
-      return count;
+      return result.length;
     } catch (error) {
       console.error("Error uploading images:", error);
       throw error;

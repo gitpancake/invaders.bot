@@ -36,7 +36,7 @@ export class StoreFlashesCron extends CronTask {
       );
 
       if (uploadCount > 0 || writtenDocuments.length > 0) {
-        console.log(`${flattened.length} flashes. ${uploadCount} new images. ${writtenDocuments} new documents. ${formattedCurrentTime()}`);
+        console.log(`${flattened.length} flashes. ${uploadCount} new images. ${writtenDocuments.length} new documents. ${formattedCurrentTime()}`);
       }
     } catch (error) {
       console.error("Error storing flashes:", error);
