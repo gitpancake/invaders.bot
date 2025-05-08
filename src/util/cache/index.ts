@@ -60,9 +60,9 @@ export class InvaderFlashCache {
     try {
       const result = await Promise.all(requests.map((request) => this.upload(request)));
 
-      console.log(`Uploaded ${result.length} images`);
+      const sum = result.reduce((total, count) => total + count, 0);
 
-      return result.length;
+      return sum;
     } catch (error) {
       console.error("Error uploading images:", error);
       throw error;
