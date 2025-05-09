@@ -6,4 +6,4 @@ config({ path: ".env" });
 
 new StoreFlashesCron("*/5 * * * *").register();
 
-new FlashSyncCron("*/1 * * * *").register();
+new FlashSyncCron("*/15 * * * *").register();
