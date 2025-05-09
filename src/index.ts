@@ -4,6 +4,10 @@ import { StoreFlashesCron } from "./util/cron-jobs/store-flashes";
 
 config({ path: ".env" });
 
-new StoreFlashesCron("*/5 * * * *").register();
+const storeFlashesCron = new StoreFlashesCron("*/1 * * * *");
+storeFlashesCron.task();
+storeFlashesCron.register();
 
-new FlashSyncCron("*/15 * * * *").register();
+const flashSyncCron = new FlashSyncCron("*/15 * * * *");
+flashSyncCron.task();
+flashSyncCron.register();
