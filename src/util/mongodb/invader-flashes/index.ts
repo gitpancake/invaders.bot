@@ -15,7 +15,12 @@ export class FlashesDb extends Mongo<Flash> {
       throw new Error("Collection is not initialized");
     }
 
-    await this.collection.createIndex({ flash_id: 1 }, { unique: true });
+    await this.collection.createIndex({ player: 1, timestamp: -1 }); // ✅ for player-filtered feed
+    await this.collection.createIndex({ city: 1, timestamp: -1 }); // ✅ for city-filtered pages
+    await this.collection.createIndex({ flash_id: 1 }, { unique: true }); // ✅ for deduping inserts
+    await this.collection.createIndex({ city: 1 }); // ✅ needed for distinct("city") queries
+    await this.collection.createIndex({ timestamp: 1 }); // ✅ fallback for timestamp sorting
+    await this.collection.createIndex({ player: 1 }); // ✅ needed for distinct("player") queries
   }
 
   public async getMany(filter: Filter<Flash>): Promise<Flash[]> {
