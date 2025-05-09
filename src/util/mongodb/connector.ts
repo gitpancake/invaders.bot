@@ -8,6 +8,8 @@ export abstract class Mongo<T extends Document> {
 
   constructor(private options: { dbName: string; collectionName: string }) {}
 
+  protected async onConnect(): Promise<void> {}
+
   private async getClient(): Promise<MongoClient> {
     const uri = process.env.DATABASE_URL!;
     if (!mongoClient) {
@@ -36,6 +38,8 @@ export abstract class Mongo<T extends Document> {
     const client = await this.getClient();
     this.db = client.db(this.options.dbName);
     this.collection = this.db.collection<T>(this.options.collectionName);
+
+    await this.onConnect();
   }
 
   protected async execute<R>(fn: (col: Collection<T>) => Promise<R>): Promise<R> {
