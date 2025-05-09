@@ -26,6 +26,7 @@ export class FlashesDb extends Mongo<Flash> {
     return this.execute(async (collection) => {
       try {
         const result = await collection.insertMany(flashes, { ordered: false });
+
         return flashes.filter((_, index) => result.insertedIds[index] !== undefined);
       } catch (error: unknown) {
         if (error instanceof MongoBulkWriteError) {
