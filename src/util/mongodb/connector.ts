@@ -1,6 +1,7 @@
 import { Collection, Db, Document, MongoClient } from "mongodb";
 
 let mongoClient: MongoClient | null = null;
+const collectionCache: Map<string, Collection<any>> = new Map();
 
 export abstract class Mongo<T extends Document> {
   protected db!: Db;
@@ -20,7 +21,6 @@ export abstract class Mongo<T extends Document> {
       await mongoClient.connect();
     } else {
       try {
-        // Ensure connection is still alive
         await mongoClient.db("admin").command({ ping: 1 });
       } catch (err) {
         console.warn("Reconnecting to Mongo...");
@@ -35,11 +35,25 @@ export abstract class Mongo<T extends Document> {
   }
 
   public async connect(): Promise<void> {
+    const cacheKey = `${this.options.dbName}.${this.options.collectionName}`;
+
+    // ✅ Reuse cached collection if available
+
     const client = await this.getClient();
     this.db = client.db(this.options.dbName);
-    this.collection = this.db.collection<T>(this.options.collectionName);
 
+    // ✅ Reuse cached collection if available
+    const cachedCollection = collectionCache.get(cacheKey);
+    if (cachedCollection) {
+      this.collection = cachedCollection as Collection<T>;
+      return;
+    }
+
+    console.log(`Connecting to ${cacheKey}`);
+
+    this.collection = this.db.collection<T>(this.options.collectionName);
     await this.onConnect();
+    collectionCache.set(cacheKey, this.collection);
   }
 
   protected async execute<R>(fn: (col: Collection<T>) => Promise<R>): Promise<R> {
