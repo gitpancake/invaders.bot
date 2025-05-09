@@ -3,8 +3,8 @@ import { MongoClient } from "mongodb";
 
 config({ path: ".env" });
 
-const uri = process.env.MONGO_URI!;
-if (!uri) throw new Error("MONGO_URI is not defined in the environment variables");
+const uri = process.env.DATABASE_URL!;
+if (!uri) throw new Error("DATABASE_URL is not defined in the environment variables");
 
 let client: MongoClient;
 let clientPromise: Promise<MongoClient>;
