@@ -1,4 +1,5 @@
-import axios, { AxiosError } from "axios";
+import axios from "axios";
+import FormData from "form-data";
 
 export interface InvaderFlash {
   imageUrl: string;
@@ -20,52 +21,62 @@ export class InvaderFlashCache {
 
   private async upload(request: InvaderFlash): Promise<number> {
     try {
-      // Step 1: Download the image to a buffer
       const response = await axios.get<ArrayBuffer>(request.imageUrl, {
         responseType: "arraybuffer",
       });
 
-      const base64Buffer = Buffer.from(response.data).toString("base64");
+      const buffer = Buffer.from(response.data);
 
-      // Step 2: Send base64 + key to Lambda
-      const resp = await axios.post(
-        `${this.IMAGE_UPLOAD_URL}/upload`,
-        {
-          body: {
-            buffer: base64Buffer,
-            key: request.key,
-          },
+      const form = new FormData();
+      form.append("key", String(request.key), {
+        contentType: "text/plain",
+      });
+      form.append("file", buffer, {
+        filename: "image.jpg",
+        contentType: "image/jpeg",
+      });
+
+      const resp = await axios.post(`${this.IMAGE_UPLOAD_URL}/upload`, form, {
+        headers: {
+          ...form.getHeaders(),
+          "x-api-key": this.LAMBDA_API_KEY,
         },
-        {
-          headers: {
-            "x-api-key": this.LAMBDA_API_KEY, // Replace with your real key
-          },
-        }
-      );
+        maxContentLength: Infinity,
+        maxBodyLength: Infinity,
+      });
 
       if (resp.data.statusCode === 201) return 1;
 
       return 0;
-    } catch (ex) {
-      if (ex instanceof AxiosError) {
-        console.error("Upload failed:", ex.response?.data || ex.message || ex);
-      } else {
-        console.error("Upload failed:", ex);
-      }
+    } catch (error) {
+      console.error("Upload failed:", error);
       return 0;
     }
   }
 
-  public async batchUpload(requests: InvaderFlash[]): Promise<number> {
-    try {
-      const result = await Promise.all(requests.map((request) => this.upload(request)));
+  public async batchUpload(requests: InvaderFlash[], concurrency = 3): Promise<number> {
+    let successCount = 0;
 
-      const sum = result.reduce((total, count) => total + count, 0);
+    const queue = [...requests];
 
-      return sum;
-    } catch (error) {
-      console.error("Error uploading images:", error);
-      throw error;
-    }
+    const runUpload = async () => {
+      while (queue.length > 0) {
+        const request = queue.shift();
+        if (!request) break;
+
+        try {
+          const result = await this.upload(request);
+          successCount += result;
+        } catch (err) {
+          console.error("Error in throttled upload:", err);
+        }
+      }
+    };
+
+    const workers = Array.from({ length: concurrency }).map(() => runUpload());
+
+    await Promise.all(workers);
+
+    return successCount;
   }
 }
