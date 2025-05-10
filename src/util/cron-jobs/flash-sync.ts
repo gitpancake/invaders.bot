@@ -85,7 +85,14 @@ export class FlashSyncCron extends CronTask {
           }
         }
 
-        docs.push({ flash, user: neynarUsr, castHash });
+        flash.id = flash._id?.toString();
+        delete flash._id;
+
+        docs.push({
+          flash,
+          user: neynarUsr,
+          castHash,
+        });
       }
 
       /* ------------------------------------------------------------------ */

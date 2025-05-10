@@ -1,4 +1,6 @@
 export interface Flash {
+  _id?: string;
+  id?: string;
   img: string;
   city: string;
   text: string;
