@@ -1,10 +1,10 @@
 import { getUnixTime } from "date-fns";
 import { config } from "dotenv";
+import { FlashcastrFlashesDb } from "../database/flashcastr-flashes";
+import { FlashcastrFlash } from "../database/flashcastr-flashes/types";
+import { FlashcastrUsersDb } from "../database/flashcastr-users";
+import { PostgresFlashesDb } from "../database/invader-flashes";
 import { decrypt } from "../encrypt";
-import { FlashcastrFlashesDb } from "../mongodb/flashcastr-flashes";
-import { Flashcastr } from "../mongodb/flashcastr-flashes/types";
-import { FlashcastrUsersDb } from "../mongodb/flashcastr-users";
-import { FlashesDb } from "../mongodb/invader-flashes";
 import { NeynarUsers } from "../neynar/users";
 import { formattedCurrentTime } from "../times";
 import { CronTask } from "./base";
@@ -12,7 +12,7 @@ import { CronTask } from "./base";
 config({ path: ".env" });
 
 export class FlashSyncCron extends CronTask {
-  private flashTimespanMins = 20;
+  private flashTimespanMins = 1;
 
   constructor(schedule: string) {
     super("flash-sync", schedule);
@@ -32,10 +32,10 @@ export class FlashSyncCron extends CronTask {
       /* 2.  Fetch flashes from the last N minutes                          */
       /* ------------------------------------------------------------------ */
       const sinceUnix = getUnixTime(new Date(Date.now() - this.flashTimespanMins * 60_000));
-      const flashes = await new FlashesDb().getMany({
-        timestamp: { $gte: sinceUnix }, // use $gte, not $lte
-        player: { $in: [...usersByUsername.keys()].map((username) => new RegExp(`^${username}$`, "i")) },
-      });
+      const flashes = await new PostgresFlashesDb().getSinceByPlayers(
+        sinceUnix,
+        [...usersByUsername.keys()].map((u) => u.toLowerCase())
+      );
       if (!flashes.length) return;
 
       /* ------------------------------------------------------------------ */
@@ -43,8 +43,8 @@ export class FlashSyncCron extends CronTask {
       /* ------------------------------------------------------------------ */
       const flashIds = flashes.map((f) => f.flash_id);
       const flashcastrFlashesDb = new FlashcastrFlashesDb();
-      const alreadyStored = await flashcastrFlashesDb.getMany({ "flash.flash_id": { $in: flashIds } });
-      const newFlashes = flashes.filter((f) => !alreadyStored.some((e) => e.flash.flash_id === f.flash_id));
+      const alreadyStored = await flashcastrFlashesDb.getByFlashIds(flashIds);
+      const newFlashes = flashes.filter((f) => !alreadyStored.some((e) => e.flash_id === f.flash_id));
       if (!newFlashes.length) return;
 
       /* ------------------------------------------------------------------ */
@@ -58,7 +58,7 @@ export class FlashSyncCron extends CronTask {
       /* 5.  Build flash-documents & optionally publish auto-casts          */
       /* ------------------------------------------------------------------ */
       const publisher = new NeynarUsers(); // reuse 1 instance
-      const docs: Flashcastr[] = [];
+      const docs: FlashcastrFlash[] = [];
 
       for (const flash of newFlashes) {
         const appUser = [...usersByUsername.entries()].find(([username]) => username.toLowerCase() === flash.player.toLowerCase())?.[1];
@@ -85,13 +85,12 @@ export class FlashSyncCron extends CronTask {
           }
         }
 
-        flash.id = flash._id?.toString();
-        delete flash._id;
-
         docs.push({
-          flash,
-          user: neynarUsr,
-          castHash,
+          flash_id: flash.flash_id,
+          user_fid: appUser.fid,
+          user_pfp_url: neynarUsr.pfp_url ?? "",
+          user_username: appUser.username,
+          cast_hash: castHash,
         });
       }
 
@@ -100,7 +99,7 @@ export class FlashSyncCron extends CronTask {
       /* ------------------------------------------------------------------ */
       if (docs.length) await flashcastrFlashesDb.insertMany(docs);
 
-      console.log(`${docs.length} flashes processed, ` + `${docs.filter((d) => d.castHash).length} auto-casts. ` + formattedCurrentTime());
+      console.log(`${docs.length} flashes processed, ` + `${docs.filter((d) => d.cast_hash).length} auto-casts. ` + formattedCurrentTime());
     } catch (error) {
       console.error("flash-sync cron failed:", error);
     }

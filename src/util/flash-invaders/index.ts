@@ -1,5 +1,5 @@
 import axios, { AxiosInstance } from "axios";
-import { Flash } from "../mongodb/invader-flashes/types";
+import { Flash } from "../database/invader-flashes/types";
 
 interface FlashInvaderResponse {
   with_paris: Flash[];
