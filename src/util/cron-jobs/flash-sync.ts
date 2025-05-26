@@ -90,7 +90,7 @@ export class FlashSyncCron extends CronTask {
           flash_id: flash.flash_id,
           user_fid: appUser.fid,
           user_pfp_url: neynarUsr.pfp_url ?? "",
-          user_username: appUser.username,
+          user_username: neynarUsr.username,
           cast_hash: castHash,
         });
       }
