@@ -1,10 +1,9 @@
 import { getUnixTime } from "date-fns";
-import { config } from "dotenv";
+import { config, decrypt } from "dotenv";
 import { FlashcastrFlashesDb } from "../database/flashcastr-flashes";
 import { FlashcastrFlash } from "../database/flashcastr-flashes/types";
 import { FlashcastrUsersDb } from "../database/flashcastr-users";
 import { PostgresFlashesDb } from "../database/invader-flashes";
-import { decrypt } from "../encrypt";
 import { NeynarUsers } from "../neynar/users";
 import { formattedCurrentTime } from "../times";
 import { CronTask } from "./base";
@@ -12,7 +11,7 @@ import { CronTask } from "./base";
 config({ path: ".env" });
 
 export class FlashSyncCron extends CronTask {
-  private flashTimespanMins = 6;
+  private flashTimespanMins = 10080;
 
   constructor(schedule: string) {
     super("flash-sync", schedule);
