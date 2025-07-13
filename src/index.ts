@@ -8,6 +8,6 @@ const storeFlashesCron = new StoreFlashesCron("*/7 * * * *");
 storeFlashesCron.task();
 storeFlashesCron.register();
 
-const flashSyncCron = new FlashSyncCron("*/15 * * * *");
+const flashSyncCron = new FlashSyncCron("*/5 * * * *");
 flashSyncCron.task();
 flashSyncCron.register();
