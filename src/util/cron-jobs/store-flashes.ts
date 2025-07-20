@@ -32,7 +32,6 @@ export class StoreFlashesCron extends CronTask {
       let publishCount = 0;
       for (const flash of flashesToPublish) {
         await rabbit.publish(flash);
-        console.log(`Published flash ${flash.flash_id}`);
         publishCount++;
       }
 
