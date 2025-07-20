@@ -15,10 +15,7 @@ export class StoreFlashesCron extends CronTask {
     const flashes = await invaderApi.getFlashes();
 
     if (!flashes || !flashes.with_paris.length || !flashes.without_paris.length) {
-      const message = `No flashes found. ${formattedCurrentTime()}`;
-      console.error(message);
-      // Crash the app to notify via process manager/logs
-      throw new Error(message);
+      throw new Error("No flashes found since " + formattedCurrentTime());
     }
 
     const flattened = [...flashes.with_paris, ...flashes.without_paris];
