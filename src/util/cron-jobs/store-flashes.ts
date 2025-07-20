@@ -15,6 +15,7 @@ export class StoreFlashesCron extends CronTask {
     const flashes = await invaderApi.getFlashes();
 
     if (!flashes || !flashes.with_paris.length || !flashes.without_paris.length) {
+      console.error("No flashes found since " + formattedCurrentTime());
       throw new Error("No flashes found since " + formattedCurrentTime());
     }
 
