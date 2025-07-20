@@ -28,6 +28,8 @@ export class StoreFlashesCron extends CronTask {
         return writtenDocuments.some((doc) => Number(doc.flash_id) === flash.flash_id);
       });
 
+      console.log(`Found ${flashesToPublish.length} flashes to publish`);
+
       const rabbit = new RabbitImagePush();
       let publishCount = 0;
       for (const flash of flashesToPublish) {
