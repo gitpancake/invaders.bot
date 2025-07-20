@@ -5,13 +5,14 @@ import { StoreFlashesCron } from "./util/cron-jobs/store-flashes";
 config({ path: ".env" });
 
 const main = async () => {
+  const flashSyncCron = new FlashSyncCron("*/5 * * * *");
   const storeFlashesCron = new StoreFlashesCron("*/1 * * * *");
-  storeFlashesCron.task();
+
+  flashSyncCron.register();
   storeFlashesCron.register();
 
-  const flashSyncCron = new FlashSyncCron("*/5 * * * *");
-  flashSyncCron.task();
-  flashSyncCron.register();
+  await flashSyncCron.task();
+  await storeFlashesCron.task();
 };
 
 main().catch((error) => {
