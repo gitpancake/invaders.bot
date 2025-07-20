@@ -21,6 +21,8 @@ export class StoreFlashesCron extends CronTask {
 
     const flattened = [...flashes.with_paris, ...flashes.without_paris];
 
+    console.log(`Found ${flashes.with_paris.length} flashes with Paris and ${flashes.without_paris.length} flashes without Paris`);
+
     try {
       const writtenDocuments = await new PostgresFlashesDb().writeMany(flattened);
 
