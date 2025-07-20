@@ -22,6 +22,16 @@ export class PostgresFlashesDb extends Postgres<Flash> {
     return await this.query(sql, params);
   }
 
+  async getSince(sinceUnix: number): Promise<Flash[]> {
+    const sql = `
+      SELECT * FROM flashes
+      WHERE timestamp >= to_timestamp($1)
+      ORDER BY timestamp DESC
+    `;
+
+    return await this.query(sql, [sinceUnix]);
+  }
+
   async writeMany(flashes: Flash[]): Promise<Flash[]> {
     if (!flashes.length) return [];
 
