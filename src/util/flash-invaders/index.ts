@@ -1,5 +1,7 @@
 import axios, { AxiosInstance } from "axios";
 import { Flash } from "../database/invader-flashes/types";
+import * as http from "http";
+import * as https from "https";
 
 interface FlashInvaderResponse {
   with_paris: Flash[];
@@ -313,9 +315,9 @@ class SpaceInvadersAPI {
         baseURL: this.API_URL,
         headers,
         timeout: this.getRandomTimeout(),
-        // Randomly decide on keepAlive
-        httpAgent: Math.random() < 0.7 ? undefined : { keepAlive: false },
-        httpsAgent: Math.random() < 0.7 ? undefined : { keepAlive: false },
+        // Randomly decide on keepAlive with proper Agent instances
+        httpAgent: Math.random() < 0.7 ? undefined : new http.Agent({ keepAlive: false }),
+        httpsAgent: Math.random() < 0.7 ? undefined : new https.Agent({ keepAlive: false }),
         maxRedirects: Math.floor(Math.random() * 3) + 3, // 3-5 redirects
         validateStatus: (status) => status >= 200 && status < 300,
       });
