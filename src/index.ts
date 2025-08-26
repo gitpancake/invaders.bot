@@ -6,7 +6,7 @@ config({ path: ".env" });
 
 const main = async () => {
   const flashSyncCron = new FlashSyncCron("*/5 * * * *");
-  const storeFlashesCron = new StoreFlashesCron("*/1 * * * *");
+  const storeFlashesCron = new StoreFlashesCron("*/15 * * * *");
 
   flashSyncCron.register();
   storeFlashesCron.register();
