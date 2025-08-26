@@ -29,6 +29,8 @@ class SpaceInvadersAPI {
   private requestCount: number = 0;
   private proxies: ProxyConfig[] = [];
   private currentProxyIndex: number = 0;
+  private failedProxies: Set<string> = new Set();
+  private proxyFailureCount: Map<string, number> = new Map();
 
   constructor() {
     this.instance = axios.create({
@@ -61,23 +63,61 @@ class SpaceInvadersAPI {
         console.log('Error parsing proxy list:', error);
       }
     } else {
-      // Free proxy fallbacks (these may not work reliably)
+      // Updated free proxy fallbacks from reliable sources (these may still be unreliable)
       this.proxies = [
-        { host: '8.210.83.33', port: 80, protocol: 'http' },
-        { host: '47.74.152.29', port: 8888, protocol: 'http' },
-        { host: '103.149.130.38', port: 80, protocol: 'http' },
-        { host: '20.111.54.16', port: 80, protocol: 'http' },
+        // Recent working proxies from various sources
+        { host: '103.152.112.162', port: 80, protocol: 'http' },
+        { host: '103.216.50.224', port: 8080, protocol: 'http' },
+        { host: '185.162.251.76', port: 80, protocol: 'http' },
+        { host: '190.61.88.147', port: 8080, protocol: 'http' },
+        { host: '41.65.163.86', port: 1976, protocol: 'http' },
+        { host: '103.107.197.22', port: 80, protocol: 'http' },
+        { host: '154.236.177.100', port: 1976, protocol: 'http' },
+        { host: '103.14.198.50', port: 83, protocol: 'http' },
       ];
-      console.log(`Using ${this.proxies.length} default free proxies (may be unreliable)`);
+      console.log(`Using ${this.proxies.length} updated free proxies (may be unreliable - consider setting PROXY_LIST env var with premium proxies)`);
     }
   }
 
   private getNextProxy(): ProxyConfig | null {
     if (this.proxies.length === 0) return null;
     
-    const proxy = this.proxies[this.currentProxyIndex];
-    this.currentProxyIndex = (this.currentProxyIndex + 1) % this.proxies.length;
-    return proxy;
+    // Try to find a working proxy
+    let attempts = 0;
+    const maxAttempts = this.proxies.length;
+    
+    while (attempts < maxAttempts) {
+      const proxy = this.proxies[this.currentProxyIndex];
+      const proxyKey = `${proxy.host}:${proxy.port}`;
+      this.currentProxyIndex = (this.currentProxyIndex + 1) % this.proxies.length;
+      
+      // Skip proxies that have failed too many times
+      const failureCount = this.proxyFailureCount.get(proxyKey) || 0;
+      if (failureCount < 3) { // Allow up to 3 failures before skipping
+        return proxy;
+      }
+      
+      attempts++;
+    }
+    
+    // If all proxies have failed too many times, reset failure counts and try again
+    if (attempts >= maxAttempts) {
+      console.log('All proxies have failed multiple times, resetting failure counts');
+      this.proxyFailureCount.clear();
+      this.failedProxies.clear();
+      return this.proxies[0]; // Return first proxy as fallback
+    }
+    
+    return null;
+  }
+
+  private markProxyAsFailed(proxy: ProxyConfig): void {
+    const proxyKey = `${proxy.host}:${proxy.port}`;
+    const currentCount = this.proxyFailureCount.get(proxyKey) || 0;
+    this.proxyFailureCount.set(proxyKey, currentCount + 1);
+    this.failedProxies.add(proxyKey);
+    
+    console.log(`Proxy ${proxyKey} failed (${currentCount + 1} times)`);
   }
 
   private createProxyAgent(proxy: ProxyConfig): any {
@@ -370,6 +410,10 @@ class SpaceInvadersAPI {
   }
 
   public async getFlashes(): Promise<FlashInvaderResponse | null> {
+    // Declare variables at function scope so they're accessible in catch block
+    let proxy: ProxyConfig | null = null;
+    let usingProxy = false;
+    
     try {
       // Add human-like delay
       await this.humanDelay();
@@ -378,11 +422,12 @@ class SpaceInvadersAPI {
       const headers = this.shuffleHeaders(this.getRandomHeaders());
       
       // Get a proxy for this request (rotates through available proxies)
-      const proxy = this.getNextProxy();
+      proxy = this.getNextProxy();
       let agent: any;
       
       if (proxy) {
         agent = this.createProxyAgent(proxy);
+        usingProxy = true;
         console.log(`Using proxy: ${proxy.host}:${proxy.port}`);
       } else {
         // Fallback to direct connection with random keepAlive
@@ -390,6 +435,7 @@ class SpaceInvadersAPI {
           this.API_URL.startsWith('https://') ? 
             new https.Agent({ keepAlive: false }) : 
             new http.Agent({ keepAlive: false });
+        console.log('No working proxies available, attempting direct connection');
       }
 
       // Create a new axios instance for this request with random configuration
@@ -423,6 +469,12 @@ class SpaceInvadersAPI {
       return response.data;
     } catch (error) {
       this.consecutiveFailures++;
+      
+      // Mark proxy as failed if we were using one
+      if (usingProxy && proxy) {
+        this.markProxyAsFailed(proxy);
+      }
+      
       console.error(`Failed to fetch flashes (consecutive failures: ${this.consecutiveFailures}):`, error);
       
       // If we have too many consecutive failures, reset session
