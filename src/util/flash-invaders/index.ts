@@ -31,6 +31,7 @@ class SpaceInvadersAPI {
   private currentProxyIndex: number = 0;
   private failedProxies: Set<string> = new Set();
   private proxyFailureCount: Map<string, number> = new Map();
+  private isOxylabs: boolean = false;
 
   constructor() {
     this.instance = axios.create({
@@ -59,6 +60,17 @@ class SpaceInvadersAPI {
           };
         });
         console.log(`Loaded ${this.proxies.length} proxies from environment`);
+        
+        // If using Oxylabs, disable failure tracking since they handle rotation internally
+        this.isOxylabs = this.proxies.some(p => 
+          p.host.includes('oxylabs.io') || 
+          p.host.includes('pr.oxylabs.io') || 
+          p.host.includes('datacenter.oxylabs.io')
+        );
+        
+        if (this.isOxylabs) {
+          console.log('Detected Oxylabs proxies - optimizing configuration for premium service');
+        }
       } catch (error) {
         console.log('Error parsing proxy list:', error);
       }
@@ -82,7 +94,14 @@ class SpaceInvadersAPI {
   private getNextProxy(): ProxyConfig | null {
     if (this.proxies.length === 0) return null;
     
-    // Try to find a working proxy
+    // For Oxylabs, use simple rotation since they handle failures internally
+    if (this.isOxylabs) {
+      const proxy = this.proxies[this.currentProxyIndex];
+      this.currentProxyIndex = (this.currentProxyIndex + 1) % this.proxies.length;
+      return proxy;
+    }
+    
+    // For other proxies, use failure tracking
     let attempts = 0;
     const maxAttempts = this.proxies.length;
     
@@ -112,6 +131,12 @@ class SpaceInvadersAPI {
   }
 
   private markProxyAsFailed(proxy: ProxyConfig): void {
+    // Don't track failures for Oxylabs since they handle rotation internally
+    if (this.isOxylabs) {
+      console.log(`Request failed with Oxylabs proxy ${proxy.host}:${proxy.port} - will retry with same endpoint`);
+      return;
+    }
+    
     const proxyKey = `${proxy.host}:${proxy.port}`;
     const currentCount = this.proxyFailureCount.get(proxyKey) || 0;
     this.proxyFailureCount.set(proxyKey, currentCount + 1);
