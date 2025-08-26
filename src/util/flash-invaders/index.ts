@@ -324,9 +324,9 @@ class SpaceInvadersAPI {
 
       console.log(`Making request with User-Agent: ${headers["User-Agent"].substring(0, 50)}...`);
       
-      // Make the request with retry logic
+      // Make the request with retry logic (note the trailing slash - API requires it)
       const response = await this.retryWithBackoff(async () => {
-        return await requestInstance.get<FlashInvaderResponse>(`/flashinvaders/flashes`);
+        return await requestInstance.get<FlashInvaderResponse>(`/flashinvaders/flashes/`);
       });
 
       // Reset failure counter on success
