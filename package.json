@@ -35,6 +35,8 @@
     "axios": "^1.7.9",
     "date-fns": "^4.1.0",
     "dotenv": "^16.4.7",
+    "http-proxy-agent": "^7.0.2",
+    "https-proxy-agent": "^7.0.6",
     "node-cron": "^3.0.3",
     "pg": "^8.16.0"
   },

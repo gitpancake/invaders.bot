@@ -2,10 +2,22 @@ import axios, { AxiosInstance } from "axios";
 import { Flash } from "../database/invader-flashes/types";
 import * as http from "http";
 import * as https from "https";
+import { HttpsProxyAgent } from 'https-proxy-agent';
+import { HttpProxyAgent } from 'http-proxy-agent';
 
 interface FlashInvaderResponse {
   with_paris: Flash[];
   without_paris: Flash[];
+}
+
+interface ProxyConfig {
+  host: string;
+  port: number;
+  protocol: 'http' | 'https';
+  auth?: {
+    username: string;
+    password: string;
+  };
 }
 
 class SpaceInvadersAPI {
@@ -15,12 +27,67 @@ class SpaceInvadersAPI {
   private consecutiveFailures: number = 0;
   private sessionStartTime: number = Date.now();
   private requestCount: number = 0;
+  private proxies: ProxyConfig[] = [];
+  private currentProxyIndex: number = 0;
 
   constructor() {
     this.instance = axios.create({
       baseURL: this.API_URL,
       timeout: this.getRandomTimeout(),
     });
+    this.loadProxiesFromEnv();
+  }
+
+  private loadProxiesFromEnv(): void {
+    const proxyList = process.env.PROXY_LIST;
+    if (proxyList) {
+      try {
+        // Format: "http://proxy1:8080,https://user:pass@proxy2:3128"
+        const proxyStrings = proxyList.split(',');
+        this.proxies = proxyStrings.map(proxyStr => {
+          const url = new URL(proxyStr.trim());
+          return {
+            host: url.hostname,
+            port: parseInt(url.port) || (url.protocol === 'https:' ? 443 : 80),
+            protocol: url.protocol.replace(':', '') as 'http' | 'https',
+            auth: url.username && url.password ? {
+              username: url.username,
+              password: url.password
+            } : undefined
+          };
+        });
+        console.log(`Loaded ${this.proxies.length} proxies from environment`);
+      } catch (error) {
+        console.log('Error parsing proxy list:', error);
+      }
+    } else {
+      // Free proxy fallbacks (these may not work reliably)
+      this.proxies = [
+        { host: '8.210.83.33', port: 80, protocol: 'http' },
+        { host: '47.74.152.29', port: 8888, protocol: 'http' },
+        { host: '103.149.130.38', port: 80, protocol: 'http' },
+        { host: '20.111.54.16', port: 80, protocol: 'http' },
+      ];
+      console.log(`Using ${this.proxies.length} default free proxies (may be unreliable)`);
+    }
+  }
+
+  private getNextProxy(): ProxyConfig | null {
+    if (this.proxies.length === 0) return null;
+    
+    const proxy = this.proxies[this.currentProxyIndex];
+    this.currentProxyIndex = (this.currentProxyIndex + 1) % this.proxies.length;
+    return proxy;
+  }
+
+  private createProxyAgent(proxy: ProxyConfig): any {
+    const proxyUrl = `${proxy.protocol}://${proxy.auth ? `${proxy.auth.username}:${proxy.auth.password}@` : ''}${proxy.host}:${proxy.port}`;
+    
+    if (this.API_URL.startsWith('https://')) {
+      return new HttpsProxyAgent(proxyUrl);
+    } else {
+      return new HttpProxyAgent(proxyUrl);
+    }
   }
 
   private getRandomTimeout(): number {
@@ -310,14 +377,28 @@ class SpaceInvadersAPI {
       // Generate and shuffle headers for this request
       const headers = this.shuffleHeaders(this.getRandomHeaders());
       
+      // Get a proxy for this request (rotates through available proxies)
+      const proxy = this.getNextProxy();
+      let agent: any;
+      
+      if (proxy) {
+        agent = this.createProxyAgent(proxy);
+        console.log(`Using proxy: ${proxy.host}:${proxy.port}`);
+      } else {
+        // Fallback to direct connection with random keepAlive
+        agent = Math.random() < 0.7 ? undefined : 
+          this.API_URL.startsWith('https://') ? 
+            new https.Agent({ keepAlive: false }) : 
+            new http.Agent({ keepAlive: false });
+      }
+
       // Create a new axios instance for this request with random configuration
       const requestInstance = axios.create({
         baseURL: this.API_URL,
         headers,
         timeout: this.getRandomTimeout(),
-        // Randomly decide on keepAlive with proper Agent instances
-        httpAgent: Math.random() < 0.7 ? undefined : new http.Agent({ keepAlive: false }),
-        httpsAgent: Math.random() < 0.7 ? undefined : new https.Agent({ keepAlive: false }),
+        // Use proxy agent or regular agent
+        ...(this.API_URL.startsWith('https://') ? { httpsAgent: agent } : { httpAgent: agent }),
         maxRedirects: Math.floor(Math.random() * 3) + 3, // 3-5 redirects
         validateStatus: (status) => status >= 200 && status < 300,
       });
