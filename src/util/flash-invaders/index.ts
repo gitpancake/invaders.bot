@@ -435,83 +435,105 @@ class SpaceInvadersAPI {
   }
 
   public async getFlashes(): Promise<FlashInvaderResponse | null> {
-    // Declare variables at function scope so they're accessible in catch block
-    let proxy: ProxyConfig | null = null;
-    let usingProxy = false;
+    const maxProxyRetries = 5;
+    let proxyAttempts = 0;
     
-    try {
-      // Add human-like delay
-      await this.humanDelay();
-
-      // Generate and shuffle headers for this request
-      const headers = this.shuffleHeaders(this.getRandomHeaders());
+    while (proxyAttempts < maxProxyRetries) {
+      let proxy: ProxyConfig | null = null;
+      let usingProxy = false;
       
-      // Get a proxy for this request (rotates through available proxies)
-      proxy = this.getNextProxy();
-      let agent: any;
-      
-      if (proxy) {
-        agent = this.createProxyAgent(proxy);
-        usingProxy = true;
-        console.log(`Using proxy: ${proxy.host}:${proxy.port}`);
-      } else {
-        // Fallback to direct connection with random keepAlive
-        agent = Math.random() < 0.7 ? undefined : 
-          this.API_URL.startsWith('https://') ? 
-            new https.Agent({ keepAlive: false }) : 
-            new http.Agent({ keepAlive: false });
-        console.log('No working proxies available, attempting direct connection');
-      }
+      try {
+        // Add human-like delay
+        await this.humanDelay();
 
-      // Create a new axios instance for this request with random configuration
-      const requestInstance = axios.create({
-        baseURL: this.API_URL,
-        headers,
-        timeout: this.getRandomTimeout(),
-        // Use proxy agent or regular agent
-        ...(this.API_URL.startsWith('https://') ? { httpsAgent: agent } : { httpAgent: agent }),
-        maxRedirects: Math.floor(Math.random() * 3) + 3, // 3-5 redirects
-        validateStatus: (status) => status >= 200 && status < 300,
-      });
+        // Generate and shuffle headers for this request
+        const headers = this.shuffleHeaders(this.getRandomHeaders());
+        
+        // Get a proxy for this request (rotates through available proxies)
+        proxy = this.getNextProxy();
+        let agent: any;
+        
+        if (proxy) {
+          agent = this.createProxyAgent(proxy);
+          usingProxy = true;
+          console.log(`Using proxy: ${proxy.host}:${proxy.port}`);
+        } else {
+          // Fallback to direct connection with random keepAlive
+          agent = Math.random() < 0.7 ? undefined : 
+            this.API_URL.startsWith('https://') ? 
+              new https.Agent({ keepAlive: false }) : 
+              new http.Agent({ keepAlive: false });
+          console.log('No working proxies available, attempting direct connection');
+        }
 
-      console.log(`Making request with User-Agent: ${headers["User-Agent"].substring(0, 50)}...`);
-      
-      // Make the request with retry logic (note the trailing slash - API requires it)
-      const response = await this.retryWithBackoff(async () => {
-        return await requestInstance.get<FlashInvaderResponse>(`/flashinvaders/flashes/`);
-      });
+        // Create a new axios instance for this request with random configuration
+        const requestInstance = axios.create({
+          baseURL: this.API_URL,
+          headers,
+          timeout: this.getRandomTimeout(),
+          // Use proxy agent or regular agent
+          ...(this.API_URL.startsWith('https://') ? { httpsAgent: agent } : { httpAgent: agent }),
+          maxRedirects: Math.floor(Math.random() * 3) + 3, // 3-5 redirects
+          validateStatus: (status) => status >= 200 && status < 300,
+        });
 
-      // Reset failure counter on success
-      this.consecutiveFailures = 0;
+        console.log(`Making request with User-Agent: ${headers["User-Agent"].substring(0, 50)}...`);
+        
+        // Make the request with retry logic (note the trailing slash - API requires it)
+        const response = await this.retryWithBackoff(async () => {
+          return await requestInstance.get<FlashInvaderResponse>(`/flashinvaders/flashes/`);
+        });
 
-      // Occasionally reset session metrics to appear as new session
-      if (Math.random() < 0.02) {
-        console.log("Simulating session reset");
-        this.sessionStartTime = Date.now();
-        this.requestCount = 0;
-      }
-
-      return response.data;
-    } catch (error) {
-      this.consecutiveFailures++;
-      
-      // Mark proxy as failed if we were using one
-      if (usingProxy && proxy) {
-        this.markProxyAsFailed(proxy);
-      }
-      
-      console.error(`Failed to fetch flashes (consecutive failures: ${this.consecutiveFailures}):`, error);
-      
-      // If we have too many consecutive failures, reset session
-      if (this.consecutiveFailures > 5) {
-        console.log("Too many failures, resetting session parameters");
-        this.sessionStartTime = Date.now();
-        this.requestCount = 0;
+        // Reset failure counter on success
         this.consecutiveFailures = 0;
+
+        // Occasionally reset session metrics to appear as new session
+        if (Math.random() < 0.02) {
+          console.log("Simulating session reset");
+          this.sessionStartTime = Date.now();
+          this.requestCount = 0;
+        }
+
+        return response.data;
+      } catch (error: any) {
+        this.consecutiveFailures++;
+        
+        // Check if this is a 407 Proxy Authentication error
+        const is407Error = error.response?.status === 407;
+        
+        if (is407Error) {
+          console.log(`Proxy authentication failed (407), trying next proxy (attempt ${proxyAttempts + 1}/${maxProxyRetries})`);
+          
+          // Mark proxy as failed if we were using one
+          if (usingProxy && proxy) {
+            this.markProxyAsFailed(proxy);
+          }
+          
+          proxyAttempts++;
+          continue; // Try again with next proxy
+        }
+        
+        // For non-407 errors, handle as before
+        if (usingProxy && proxy) {
+          this.markProxyAsFailed(proxy);
+        }
+        
+        console.error(`Failed to fetch flashes (consecutive failures: ${this.consecutiveFailures}): ${error.message || 'Unknown error'}`);
+        
+        // If we have too many consecutive failures, reset session
+        if (this.consecutiveFailures > 5) {
+          console.log("Too many failures, resetting session parameters");
+          this.sessionStartTime = Date.now();
+          this.requestCount = 0;
+          this.consecutiveFailures = 0;
+        }
+        
+        return null;
       }
-      
-      return null;
     }
+    
+    console.log('All proxy authentication attempts failed');
+    return null;
   }
 }
 
