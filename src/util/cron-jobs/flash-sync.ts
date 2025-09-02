@@ -69,6 +69,12 @@ export class FlashSyncCron extends CronTask {
 
         let castHash: string | null = null;
         if (appUser.auto_cast) {
+          // Only cast if IPFS hash is populated
+          if (!flash.ipfs_cid || flash.ipfs_cid.trim() === '') {
+            console.log(`Skipping auto-cast for flash ${flash.flash_id} - IPFS hash not yet populated`);
+            continue;
+          }
+
           try {
             const decryptionKey = process.env.SIGNER_ENCRYPTION_KEY;
 
