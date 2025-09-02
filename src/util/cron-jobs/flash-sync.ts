@@ -77,7 +77,7 @@ export class FlashSyncCron extends CronTask {
             castHash = await publisher.publishCast({
               signerUuid: decrypt(appUser.signer_uuid, decryptionKey),
               msg: `I just flashed an Invader in ${flash.city}! 👾`,
-              embeds: [{ url: `${process.env.S3_URL}${flash.img}` }],
+              embeds: [{ url: `${process.env.PINATA_URL}${flash.ipfs_cid}` }],
               channelId: "invaders",
             });
           } catch (err) {

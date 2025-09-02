@@ -37,14 +37,14 @@ export class PostgresFlashesDb extends Postgres<Flash> {
 
     const values: any[] = [];
     const valuePlaceholders = flashes.map((flash, i) => {
-      const offset = i * 7;
-      values.push(flash.flash_id, flash.city, flash.player, flash.img, flash.text, new Date(flash.timestamp * 1000), flash.flash_count);
-      return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7})`;
+      const offset = i * 8;
+      values.push(flash.flash_id, flash.city, flash.player, flash.img, flash.ipfs_cid, flash.text, new Date(flash.timestamp * 1000), flash.flash_count);
+      return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8})`;
     });
 
     const sql = `
       INSERT INTO flashes (
-        flash_id, city, player, img, text, timestamp, flash_count
+        flash_id, city, player, img, ipfs_cid, text, timestamp, flash_count
       ) VALUES
         ${valuePlaceholders.join(",")}
       ON CONFLICT (flash_id) DO NOTHING
