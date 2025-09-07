@@ -1,4 +1,5 @@
 import { PostgresFlashesDb } from "../database/invader-flashes";
+import { FlashcastrUsersDb } from "../database/flashcastr-users";
 import SpaceInvadersAPI from "../flash-invaders";
 import { RabbitImagePush } from "../rabbitmq";
 import { formattedCurrentTime } from "../times";
@@ -22,13 +23,31 @@ export class StoreFlashesCron extends CronTask {
     const flattened = [...flashes.with_paris, ...flashes.without_paris];
 
     try {
+      // Get flashcastr users to filter paris flashes
+      const flashcastrUsers = await new FlashcastrUsersDb().getMany({});
+      const flashcastrUsernames = new Set(flashcastrUsers.map(user => user.username.toLowerCase()));
+
       const writtenDocuments = await new PostgresFlashesDb().writeMany(flattened);
 
+      // Filter which flashes to publish to RabbitMQ
       const flashesToPublish = flattened.filter((flash) => {
-        return writtenDocuments.some((doc) => Number(doc.flash_id) === flash.flash_id);
+        const isNewFlash = writtenDocuments.some((doc) => Number(doc.flash_id) === flash.flash_id);
+        if (!isNewFlash) return false;
+
+        // Always publish without_paris flashes
+        if (flashes.without_paris.some(f => f.flash_id === flash.flash_id)) {
+          return true;
+        }
+
+        // Only publish with_paris flashes if flashed by a flashcastr user
+        if (flashes.with_paris.some(f => f.flash_id === flash.flash_id)) {
+          return flashcastrUsernames.has(flash.player.toLowerCase());
+        }
+
+        return false;
       });
 
-      console.log(`Found ${flashesToPublish.length} flashes to publish`);
+      console.log(`Found ${flashesToPublish.length} flashes to publish (${flashes.without_paris.filter(f => writtenDocuments.some(doc => Number(doc.flash_id) === f.flash_id)).length} without_paris + ${flashesToPublish.filter(f => flashes.with_paris.some(wp => wp.flash_id === f.flash_id)).length} with_paris from flashcastr users)`);
 
       const rabbit = new RabbitImagePush();
       let publishCount = 0;
