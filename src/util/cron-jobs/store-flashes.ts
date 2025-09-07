@@ -57,7 +57,7 @@ export class StoreFlashesCron extends CronTask {
         flashcastrUsernames.has(f.player.toLowerCase())
       ).length;
       
-      console.log(`Found ${flashesToPublish.length} flashes to publish (${newWithoutParisCount} without_paris + ${newWithParisFromFlashcastrCount} with_paris from flashcastr users)`);
+      console.log(`Found ${flashesToProcess.length} flashes to process, ${flashesToPublish.length} new flashes to publish (${newWithoutParisCount} without_paris + ${newWithParisFromFlashcastrCount} with_paris from flashcastr users)`);
 
       const rabbit = new RabbitImagePush();
       let publishCount = 0;
