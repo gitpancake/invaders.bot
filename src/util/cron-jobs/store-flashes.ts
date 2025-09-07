@@ -27,24 +27,26 @@ export class StoreFlashesCron extends CronTask {
       const flashcastrUsers = await new FlashcastrUsersDb().getMany({});
       const flashcastrUsernames = new Set(flashcastrUsers.map(user => user.username.toLowerCase()));
 
-      const writtenDocuments = await new PostgresFlashesDb().writeMany(flattened);
-
-      // Filter which flashes to publish to RabbitMQ
-      const flashesToPublish = flattened.filter((flash) => {
-        const isNewFlash = writtenDocuments.some((doc) => Number(doc.flash_id) === flash.flash_id);
-        if (!isNewFlash) return false;
-
-        // Always publish without_paris flashes
+      // Filter which flashes to write to database and publish to RabbitMQ
+      const flashesToProcess = flattened.filter((flash) => {
+        // Always include without_paris flashes
         if (flashes.without_paris.some(f => f.flash_id === flash.flash_id)) {
           return true;
         }
 
-        // Only publish with_paris flashes if flashed by a flashcastr user
+        // Only include with_paris flashes if flashed by a flashcastr user
         if (flashes.with_paris.some(f => f.flash_id === flash.flash_id)) {
           return flashcastrUsernames.has(flash.player.toLowerCase());
         }
 
         return false;
+      });
+
+      const writtenDocuments = await new PostgresFlashesDb().writeMany(flashesToProcess);
+
+      // All written documents should be published to RabbitMQ
+      const flashesToPublish = flashesToProcess.filter((flash) => {
+        return writtenDocuments.some((doc) => Number(doc.flash_id) === flash.flash_id);
       });
 
       const newWithoutParisCount = flashesToPublish.filter(f => 
