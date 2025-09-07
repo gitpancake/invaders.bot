@@ -47,7 +47,13 @@ export class StoreFlashesCron extends CronTask {
         return false;
       });
 
-      console.log(`Found ${flashesToPublish.length} flashes to publish (${flashes.without_paris.filter(f => writtenDocuments.some(doc => Number(doc.flash_id) === f.flash_id)).length} without_paris + ${flashesToPublish.filter(f => flashes.with_paris.some(wp => wp.flash_id === f.flash_id)).length} with_paris from flashcastr users)`);
+      const newWithoutParisCount = flashes.without_paris.filter(f => writtenDocuments.some(doc => Number(doc.flash_id) === f.flash_id)).length;
+      const newWithParisFromFlashcastrCount = flashesToPublish.filter(f => 
+        flashes.with_paris.some(wp => wp.flash_id === f.flash_id) && 
+        flashcastrUsernames.has(f.player.toLowerCase())
+      ).length;
+      
+      console.log(`Found ${flashesToPublish.length} flashes to publish (${newWithoutParisCount} without_paris + ${newWithParisFromFlashcastrCount} with_paris from flashcastr users)`);
 
       const rabbit = new RabbitImagePush();
       let publishCount = 0;
