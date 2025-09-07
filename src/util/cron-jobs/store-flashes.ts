@@ -47,7 +47,9 @@ export class StoreFlashesCron extends CronTask {
         return false;
       });
 
-      const newWithoutParisCount = flashes.without_paris.filter(f => writtenDocuments.some(doc => Number(doc.flash_id) === f.flash_id)).length;
+      const newWithoutParisCount = flashesToPublish.filter(f => 
+        flashes.without_paris.some(wp => wp.flash_id === f.flash_id)
+      ).length;
       const newWithParisFromFlashcastrCount = flashesToPublish.filter(f => 
         flashes.with_paris.some(wp => wp.flash_id === f.flash_id) && 
         flashcastrUsernames.has(f.player.toLowerCase())
