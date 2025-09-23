@@ -63,6 +63,11 @@ export class StoreFlashesCron extends CronTask {
 
       console.log(`[StoreFlashesCron] Processing ${flashesToProcess.length} flashes (${context})`);
 
+      // First, check which flashes already exist in DB
+      const flashIds = flashesToProcess.map(f => f.flash_id);
+      const existingFlashes = await this.getFlashesByIds(flashIds);
+      const existingFlashIds = new Set(existingFlashes.map(f => f.flash_id));
+
       // Database write with error handling and persistence
       let writtenDocuments: any[] = [];
       try {
@@ -78,10 +83,19 @@ export class StoreFlashesCron extends CronTask {
         return;
       }
 
-      // All written documents should be published to RabbitMQ
-      const flashesToPublish = flashesToProcess.filter((flash) => {
+      // Flashes to publish: newly written + existing ones without ipfs_cid
+      const newlyWrittenFlashes = flashesToProcess.filter((flash) => {
         return writtenDocuments.some((doc) => Number(doc.flash_id) === flash.flash_id);
       });
+
+      const existingFlashesWithoutIpfs = existingFlashes.filter(flash => 
+        !flash.ipfs_cid || flash.ipfs_cid.trim() === ''
+      );
+
+      const flashesToPublish = [
+        ...newlyWrittenFlashes,
+        ...existingFlashesWithoutIpfs
+      ];
 
       if (flashesToPublish.length === 0) {
         console.log(`[StoreFlashesCron] No flashes to publish to RabbitMQ (${context})`);
@@ -118,7 +132,7 @@ export class StoreFlashesCron extends CronTask {
           flashcastrUsernames.has(f.player.toLowerCase())
         ).length;
         
-        console.log(`[StoreFlashesCron] Found ${flashesToProcess.length} flashes to process, ${flashesToPublish.length} new flashes to publish (${newWithoutParisCount} without_paris + ${newWithParisFromFlashcastrCount} with_paris from flashcastr users)`);
+        console.log(`[StoreFlashesCron] Found ${flashesToProcess.length} flashes to process, ${flashesToPublish.length} flashes to publish (${newlyWrittenFlashes.length} new + ${existingFlashesWithoutIpfs.length} existing without ipfs_cid) (${newWithoutParisCount} without_paris + ${newWithParisFromFlashcastrCount} with_paris from flashcastr users)`);
       }
 
       if (publishCount > 0 || writtenDocuments.length > 0) {
@@ -136,5 +150,10 @@ export class StoreFlashesCron extends CronTask {
       // Persist all flashes to disk if we hit an unexpected error
       await this.diskPersistence.persistFailedFlashes(flattened, `unexpected-error-${context}: ${(error as Error).message}`);
     }
+  }
+
+  private async getFlashesByIds(flashIds: number[]): Promise<any[]> {
+    const flashesDb = new PostgresFlashesDb();
+    return await flashesDb.getByIds(flashIds);
   }
 }

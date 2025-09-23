@@ -32,6 +32,15 @@ export class PostgresFlashesDb extends Postgres<Flash> {
     return await this.query(sql, [sinceUnix]);
   }
 
+  async getByIds(flashIds: number[]): Promise<Flash[]> {
+    if (flashIds.length === 0) return [];
+
+    const placeholders = flashIds.map((_, i) => `$${i + 1}`).join(',');
+    const sql = `SELECT * FROM flashes WHERE flash_id IN (${placeholders})`;
+    
+    return await this.query(sql, flashIds);
+  }
+
   async writeMany(flashes: Flash[]): Promise<Flash[]> {
     if (!flashes.length) return [];
 
