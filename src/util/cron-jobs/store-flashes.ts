@@ -4,14 +4,25 @@ import SpaceInvadersAPI from "../flash-invaders";
 import { RabbitImagePush } from "../rabbitmq";
 import { formattedCurrentTime } from "../times";
 import { CronTask } from "./base";
+import { DiskPersistence } from "../disk-persistence";
 
 export class StoreFlashesCron extends CronTask {
+  private diskPersistence: DiskPersistence;
+
   constructor(schedule: string) {
     super("store-flashes", schedule);
+    this.diskPersistence = new DiskPersistence();
   }
 
   public async task(): Promise<void> {
     const invaderApi = new SpaceInvadersAPI();
+
+    // First, try to retry any previously failed flashes
+    const previouslyFailedFlashes = await this.diskPersistence.retryFailedFlashes();
+    if (previouslyFailedFlashes.length > 0) {
+      console.log(`[StoreFlashesCron] Retrying ${previouslyFailedFlashes.length} previously failed flashes...`);
+      await this.processFlashes(previouslyFailedFlashes, 'retry-failed-flashes');
+    }
 
     const flashes = await invaderApi.getFlashes();
 
@@ -21,7 +32,10 @@ export class StoreFlashesCron extends CronTask {
     }
 
     const flattened = [...flashes.with_paris, ...flashes.without_paris];
+    await this.processFlashes(flattened, 'new-flashes', flashes);
+  }
 
+  private async processFlashes(flattened: any[], context: string, originalFlashes?: any): Promise<void> {
     try {
       // Get flashcastr users to filter paris flashes
       const flashcastrUsers = await new FlashcastrUsersDb().getMany({});
@@ -29,48 +43,98 @@ export class StoreFlashesCron extends CronTask {
 
       // Filter which flashes to write to database and publish to RabbitMQ
       const flashesToProcess = flattened.filter((flash) => {
+        // For retry scenarios, we don't have original flash categories, so process all
+        if (!originalFlashes) {
+          return true;
+        }
+
         // Always include without_paris flashes
-        if (flashes.without_paris.some(f => f.flash_id === flash.flash_id)) {
+        if (originalFlashes.without_paris?.some((f: any) => f.flash_id === flash.flash_id)) {
           return true;
         }
 
         // Only include with_paris flashes if flashed by a flashcastr user
-        if (flashes.with_paris.some(f => f.flash_id === flash.flash_id)) {
+        if (originalFlashes.with_paris?.some((f: any) => f.flash_id === flash.flash_id)) {
           return flashcastrUsernames.has(flash.player.toLowerCase());
         }
 
         return false;
       });
 
-      const writtenDocuments = await new PostgresFlashesDb().writeMany(flashesToProcess);
+      console.log(`[StoreFlashesCron] Processing ${flashesToProcess.length} flashes (${context})`);
+
+      // Database write with error handling and persistence
+      let writtenDocuments: any[] = [];
+      try {
+        writtenDocuments = await new PostgresFlashesDb().writeMany(flashesToProcess);
+        console.log(`[StoreFlashesCron] Successfully wrote ${writtenDocuments.length} documents to database`);
+      } catch (dbError) {
+        console.error(`[StoreFlashesCron] Database write failed (${context}):`, dbError);
+        
+        // Persist failed flashes to disk for retry
+        await this.diskPersistence.persistFailedFlashes(flashesToProcess, `database-write-failure-${context}: ${(dbError as Error).message}`);
+        
+        // Don't proceed to RabbitMQ if database write failed
+        return;
+      }
 
       // All written documents should be published to RabbitMQ
       const flashesToPublish = flashesToProcess.filter((flash) => {
         return writtenDocuments.some((doc) => Number(doc.flash_id) === flash.flash_id);
       });
 
-      const newWithoutParisCount = flashesToPublish.filter(f => 
-        flashes.without_paris.some(wp => wp.flash_id === f.flash_id)
-      ).length;
-      const newWithParisFromFlashcastrCount = flashesToPublish.filter(f => 
-        flashes.with_paris.some(wp => wp.flash_id === f.flash_id) && 
-        flashcastrUsernames.has(f.player.toLowerCase())
-      ).length;
-      
-      console.log(`Found ${flashesToProcess.length} flashes to process, ${flashesToPublish.length} new flashes to publish (${newWithoutParisCount} without_paris + ${newWithParisFromFlashcastrCount} with_paris from flashcastr users)`);
+      if (flashesToPublish.length === 0) {
+        console.log(`[StoreFlashesCron] No flashes to publish to RabbitMQ (${context})`);
+        return;
+      }
 
+      // RabbitMQ publishing with error handling and persistence
       const rabbit = new RabbitImagePush();
+      const failedPublishes: any[] = [];
       let publishCount = 0;
+
       for (const flash of flashesToPublish) {
-        await rabbit.publish(flash);
-        publishCount++;
+        try {
+          await rabbit.publish(flash);
+          publishCount++;
+        } catch (rabbitError) {
+          console.error(`[StoreFlashesCron] Failed to publish flash ${flash.flash_id} to RabbitMQ:`, rabbitError);
+          failedPublishes.push(flash);
+        }
+      }
+
+      // Persist any failed RabbitMQ publishes to disk
+      if (failedPublishes.length > 0) {
+        await this.diskPersistence.persistFailedFlashes(failedPublishes, `rabbitmq-publish-failure-${context}`);
+      }
+
+      // Logging for successful operations
+      if (originalFlashes) {
+        const newWithoutParisCount = flashesToPublish.filter(f => 
+          originalFlashes.without_paris?.some((wp: any) => wp.flash_id === f.flash_id)
+        ).length;
+        const newWithParisFromFlashcastrCount = flashesToPublish.filter(f => 
+          originalFlashes.with_paris?.some((wp: any) => wp.flash_id === f.flash_id) && 
+          flashcastrUsernames.has(f.player.toLowerCase())
+        ).length;
+        
+        console.log(`[StoreFlashesCron] Found ${flashesToProcess.length} flashes to process, ${flashesToPublish.length} new flashes to publish (${newWithoutParisCount} without_paris + ${newWithParisFromFlashcastrCount} with_paris from flashcastr users)`);
       }
 
       if (publishCount > 0 || writtenDocuments.length > 0) {
-        console.log(`${flattened.length} flashes. ${publishCount} new events published. ${writtenDocuments.length} new documents. ${formattedCurrentTime()}`);
+        console.log(`[StoreFlashesCron] ${flattened.length} flashes. ${publishCount} new events published. ${writtenDocuments.length} new documents. ${formattedCurrentTime()}`);
       }
+
+      // Clear successfully processed failed flashes if this was a retry
+      if (context === 'retry-failed-flashes' && publishCount > 0) {
+        await this.diskPersistence.clearFailedFlashes();
+      }
+
     } catch (error) {
-      console.error("Error storing flashes:", error);
+      console.error(`[StoreFlashesCron] Unexpected error processing flashes (${context}):`, error);
+      
+      // Persist all flashes to disk if we hit an unexpected error
+      await this.diskPersistence.persistFailedFlashes(flattened, `unexpected-error-${context}: ${(error as Error).message}`);
     }
   }
 }
