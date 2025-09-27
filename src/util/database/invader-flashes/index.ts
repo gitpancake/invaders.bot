@@ -80,21 +80,29 @@ export class PostgresFlashesDb extends Postgres<Flash> {
 
     console.log(`[PostgresFlashesDb] Inserting ${validFlashes.length}/${flashes.length} validated flashes`);
 
-    const values: any[] = [];
-    const valuePlaceholders = validFlashes.map((flash, i) => {
-      const offset = i * 8;
-      values.push(flash.flash_id, flash.city, flash.player, flash.img, flash.ipfs_cid, flash.text, new Date(flash.timestamp * 1000), flash.flash_count);
-      return `($${offset + 1}, $${offset + 2}, $${offset + 3}, $${offset + 4}, $${offset + 5}, $${offset + 6}, $${offset + 7}, $${offset + 8})`;
-    });
+    // Use UNNEST for better batch insert performance
+    const flashIds = validFlashes.map(f => f.flash_id);
+    const cities = validFlashes.map(f => f.city);
+    const players = validFlashes.map(f => f.player);
+    const imgs = validFlashes.map(f => f.img);
+    const ipfsCids = validFlashes.map(f => f.ipfs_cid);
+    const texts = validFlashes.map(f => f.text);
+    const timestamps = validFlashes.map(f => new Date(f.timestamp * 1000));
+    const flashCounts = validFlashes.map(f => f.flash_count);
 
     const sql = `
       INSERT INTO flashes (
         flash_id, city, player, img, ipfs_cid, text, timestamp, flash_count
-      ) VALUES
-        ${valuePlaceholders.join(",")}
+      )
+      SELECT * FROM UNNEST(
+        $1::bigint[], $2::text[], $3::text[], $4::text[], 
+        $5::text[], $6::text[], $7::timestamp[], $8::text[]
+      ) AS t(flash_id, city, player, img, ipfs_cid, text, timestamp, flash_count)
       ON CONFLICT (flash_id) DO NOTHING
       RETURNING *;
     `;
+    
+    const values = [flashIds, cities, players, imgs, ipfsCids, texts, timestamps, flashCounts];
 
     try {
       const result = await this.query(sql, values);

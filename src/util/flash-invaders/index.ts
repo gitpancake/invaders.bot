@@ -77,19 +77,32 @@ class SpaceInvadersAPI {
         console.log('Error parsing proxy list:', error);
       }
     } else {
-      // Updated free proxy fallbacks from reliable sources (these may still be unreliable)
-      this.proxies = [
-        // Recent working proxies from various sources
-        { host: '103.152.112.162', port: 80, protocol: 'http' },
-        { host: '103.216.50.224', port: 8080, protocol: 'http' },
-        { host: '185.162.251.76', port: 80, protocol: 'http' },
-        { host: '190.61.88.147', port: 8080, protocol: 'http' },
-        { host: '41.65.163.86', port: 1976, protocol: 'http' },
-        { host: '103.107.197.22', port: 80, protocol: 'http' },
-        { host: '154.236.177.100', port: 1976, protocol: 'http' },
-        { host: '103.14.198.50', port: 83, protocol: 'http' },
-      ];
-      console.log(`Using ${this.proxies.length} updated free proxies (may be unreliable - consider setting PROXY_LIST env var with premium proxies)`);
+      // Fallback to environment-configured proxies or disable proxy usage
+      const fallbackProxyList = process.env.FALLBACK_PROXY_LIST;
+      if (fallbackProxyList) {
+        try {
+          const proxyStrings = fallbackProxyList.split(',');
+          this.proxies = proxyStrings.map(proxyStr => {
+            const url = new URL(proxyStr.trim());
+            return {
+              host: url.hostname,
+              port: parseInt(url.port) || (url.protocol === 'https:' ? 443 : 80),
+              protocol: url.protocol.replace(':', '') as 'http' | 'https',
+              auth: url.username && url.password ? {
+                username: url.username,
+                password: url.password
+              } : undefined
+            };
+          });
+          console.log(`Using ${this.proxies.length} fallback proxies from FALLBACK_PROXY_LIST`);
+        } catch (error) {
+          console.log('Error parsing fallback proxy list:', error);
+          this.proxies = [];
+        }
+      } else {
+        console.log('No proxy configuration found - using direct connections (not recommended for production)');
+        this.proxies = [];
+      }
     }
   }
 

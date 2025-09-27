@@ -75,6 +75,9 @@ export class StoreFlashesCron extends CronTask {
       // Get flashcastr users to filter paris flashes
       const flashcastrUsers = await new FlashcastrUsersDb().getMany({});
       const flashcastrUsernames = new Set(flashcastrUsers.map(user => user.username.toLowerCase()));
+      
+      // Clear flashcastrUsers array to free memory immediately
+      flashcastrUsers.length = 0;
 
       // Filter which flashes to write to database and publish to RabbitMQ
       let flashesToProcess: any[];
@@ -83,16 +86,23 @@ export class StoreFlashesCron extends CronTask {
         // For retry scenarios, we don't have original flash categories, so process all
         flashesToProcess = flattened;
       } else {
-        // Process without_paris flashes (no filtering)
-        const withoutParisToProcess = originalFlashes.without_paris || [];
+        // Process without_paris flashes (no filtering) - create shallow copy to avoid memory issues
+        const withoutParisToProcess = [...(originalFlashes.without_paris || [])];
         
-        // Process with_paris flashes (only flashcastr users)
+        // Process with_paris flashes (only flashcastr users) - filter in-place for memory efficiency
         const withParisToProcess = (originalFlashes.with_paris || []).filter((flash: any) =>
           flashcastrUsernames.has(flash.player.toLowerCase())
         );
         
         flashesToProcess = [...withoutParisToProcess, ...withParisToProcess];
+        
+        // Clear original arrays to free memory
+        originalFlashes.without_paris = null;
+        originalFlashes.with_paris = null;
       }
+      
+      // Clear flattened array reference to free memory
+      flattened.length = 0;
 
       console.log(`[StoreFlashesCron] Processing ${flashesToProcess.length} flashes (${context})`);
 
@@ -100,6 +110,9 @@ export class StoreFlashesCron extends CronTask {
       const flashIds = flashesToProcess.map(f => f.flash_id);
       const existingFlashes = await this.getFlashesByIds(flashIds);
       const existingFlashIds = new Set(existingFlashes.map(f => f.flash_id));
+      
+      // Clear flashIds array to free memory
+      flashIds.length = 0;
 
       // Database write with error handling and persistence
       let writtenDocuments: any[] = [];
@@ -140,13 +153,30 @@ export class StoreFlashesCron extends CronTask {
       const failedPublishes: any[] = [];
       let publishCount = 0;
 
-      for (const flash of flashesToPublish) {
-        try {
-          await rabbit.publish(flash);
-          publishCount++;
-        } catch (rabbitError) {
-          console.error(`[StoreFlashesCron] Failed to publish flash ${flash.flash_id} to RabbitMQ:`, rabbitError);
-          failedPublishes.push(flash);
+      // Process in smaller batches to reduce memory usage
+      const batchSize = parseInt(process.env.RABBITMQ_BATCH_SIZE || '50');
+      for (let i = 0; i < flashesToPublish.length; i += batchSize) {
+        const batch = flashesToPublish.slice(i, i + batchSize);
+        
+        // Process batch in parallel but with concurrency limit
+        const concurrencyLimit = parseInt(process.env.RABBITMQ_CONCURRENCY || '5');
+        for (let j = 0; j < batch.length; j += concurrencyLimit) {
+          const concurrentBatch = batch.slice(j, j + concurrencyLimit);
+          
+          await Promise.allSettled(concurrentBatch.map(async (flash) => {
+            try {
+              await rabbit.publish(flash);
+              publishCount++;
+            } catch (rabbitError) {
+              console.error(`[StoreFlashesCron] Failed to publish flash ${flash.flash_id} to RabbitMQ:`, rabbitError);
+              failedPublishes.push(flash);
+            }
+          }));
+        }
+        
+        // Small delay between batches to prevent overwhelming RabbitMQ
+        if (i + batchSize < flashesToPublish.length) {
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
       }
 
