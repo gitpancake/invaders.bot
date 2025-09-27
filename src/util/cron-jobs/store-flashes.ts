@@ -42,24 +42,22 @@ export class StoreFlashesCron extends CronTask {
       const flashcastrUsernames = new Set(flashcastrUsers.map(user => user.username.toLowerCase()));
 
       // Filter which flashes to write to database and publish to RabbitMQ
-      const flashesToProcess = flattened.filter((flash) => {
+      let flashesToProcess: any[];
+      
+      if (!originalFlashes) {
         // For retry scenarios, we don't have original flash categories, so process all
-        if (!originalFlashes) {
-          return true;
-        }
-
-        // Always include without_paris flashes
-        if (originalFlashes.without_paris?.some((f: any) => f.flash_id === flash.flash_id)) {
-          return true;
-        }
-
-        // Only include with_paris flashes if flashed by a flashcastr user
-        if (originalFlashes.with_paris?.some((f: any) => f.flash_id === flash.flash_id)) {
-          return flashcastrUsernames.has(flash.player.toLowerCase());
-        }
-
-        return false;
-      });
+        flashesToProcess = flattened;
+      } else {
+        // Process without_paris flashes (no filtering)
+        const withoutParisToProcess = originalFlashes.without_paris || [];
+        
+        // Process with_paris flashes (only flashcastr users)
+        const withParisToProcess = (originalFlashes.with_paris || []).filter((flash: any) =>
+          flashcastrUsernames.has(flash.player.toLowerCase())
+        );
+        
+        flashesToProcess = [...withoutParisToProcess, ...withParisToProcess];
+      }
 
       console.log(`[StoreFlashesCron] Processing ${flashesToProcess.length} flashes (${context})`);
 
