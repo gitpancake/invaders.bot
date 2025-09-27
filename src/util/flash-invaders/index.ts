@@ -6,6 +6,8 @@ import { HttpsProxyAgent } from 'https-proxy-agent';
 import { HttpProxyAgent } from 'http-proxy-agent';
 
 interface FlashInvaderResponse {
+  flash_count: string;
+  player_count: string;
   with_paris: Flash[];
   without_paris: Flash[];
 }
