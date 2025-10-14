@@ -1,18 +1,14 @@
 import { config } from "dotenv";
-import { FlashSyncCron } from "./util/cron-jobs/flash-sync";
-import { StoreFlashesCron } from "./util/cron-jobs/store-flashes";
+import { CombinedSyncCron } from "./util/cron-jobs/combined-sync";
 
 config({ path: ".env" });
 
 const main = async () => {
-  const flashSyncCron = new FlashSyncCron("5,15,25,35,45,55 * * * *");
-  const storeFlashesCron = new StoreFlashesCron("*/5 * * * *");
+  const combinedSyncCron = new CombinedSyncCron("*/5 * * * *");
 
-  flashSyncCron.register();
-  storeFlashesCron.register();
+  combinedSyncCron.register();
 
-  await flashSyncCron.task();
-  await storeFlashesCron.task();
+  await combinedSyncCron.task();
 };
 
 main().catch((error) => {

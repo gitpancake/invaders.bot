@@ -7,18 +7,21 @@ import { CronTask } from "./base";
 import { DiskPersistence } from "../disk-persistence";
 
 export class StoreFlashesCron extends CronTask {
-  private diskPersistence: DiskPersistence;
-  private lastFlashCount: string | null = null;
-  private consecutiveNoChanges: number = 0;
+  private static diskPersistence: DiskPersistence = new DiskPersistence();
+  private static lastFlashCount: string | null = null;
+  private static consecutiveNoChanges: number = 0;
 
   constructor(schedule: string) {
     super("store-flashes", schedule);
-    this.diskPersistence = new DiskPersistence();
   }
 
   public async task(): Promise<void> {
+    return StoreFlashesCron.executeTask();
+  }
+
+  public static async executeTask(): Promise<void> {
     // Smart scheduling: skip some runs during European night hours (11 PM - 6 AM CET)
-    if (!this.isPeakFlashTime()) {
+    if (!StoreFlashesCron.isPeakFlashTime()) {
       // During off-peak, only run every other scheduled time (reduces frequency by 50%)
       const shouldSkip = Math.random() < 0.5;
       if (shouldSkip) {
@@ -30,10 +33,10 @@ export class StoreFlashesCron extends CronTask {
     const invaderApi = new SpaceInvadersAPI();
 
     // First, try to retry any previously failed flashes
-    const previouslyFailedFlashes = await this.diskPersistence.retryFailedFlashes();
+    const previouslyFailedFlashes = await StoreFlashesCron.diskPersistence.retryFailedFlashes();
     if (previouslyFailedFlashes.length > 0) {
       console.log(`[StoreFlashesCron] Retrying ${previouslyFailedFlashes.length} previously failed flashes...`);
-      await this.processFlashes(previouslyFailedFlashes, 'retry-failed-flashes');
+      await StoreFlashesCron.processFlashes(previouslyFailedFlashes, 'retry-failed-flashes');
     }
 
     const flashes = await invaderApi.getFlashes();
@@ -45,32 +48,32 @@ export class StoreFlashesCron extends CronTask {
 
     // Check if flash count has changed to avoid unnecessary processing
     const currentFlashCount = flashes.flash_count;
-    if (this.lastFlashCount === currentFlashCount) {
-      this.consecutiveNoChanges++;
-      
+    if (StoreFlashesCron.lastFlashCount === currentFlashCount) {
+      StoreFlashesCron.consecutiveNoChanges++;
+
       // Implement backoff: skip more frequently if we've seen many unchanged results
-      const backoffThreshold = Math.min(this.consecutiveNoChanges, 10); // Max backoff at 10 consecutive
+      const backoffThreshold = Math.min(StoreFlashesCron.consecutiveNoChanges, 10); // Max backoff at 10 consecutive
       const shouldSkipDueToBackoff = Math.random() < (backoffThreshold * 0.1); // 10% skip rate per consecutive no-change
-      
+
       if (shouldSkipDueToBackoff) {
-        console.log(`[StoreFlashesCron] Backoff skip (${this.consecutiveNoChanges} consecutive unchanged, count: ${currentFlashCount})`);
+        console.log(`[StoreFlashesCron] Backoff skip (${StoreFlashesCron.consecutiveNoChanges} consecutive unchanged, count: ${currentFlashCount})`);
         return;
       }
-      
-      console.log(`[StoreFlashesCron] No new flashes detected (${this.consecutiveNoChanges} consecutive, count: ${currentFlashCount}) - skipping processing`);
+
+      console.log(`[StoreFlashesCron] No new flashes detected (${StoreFlashesCron.consecutiveNoChanges} consecutive, count: ${currentFlashCount}) - skipping processing`);
       return;
     }
 
     // Reset backoff counter when we detect changes
-    console.log(`[StoreFlashesCron] Flash count changed: ${this.lastFlashCount} → ${currentFlashCount} (after ${this.consecutiveNoChanges} unchanged)`);
-    this.consecutiveNoChanges = 0;
-    this.lastFlashCount = currentFlashCount;
+    console.log(`[StoreFlashesCron] Flash count changed: ${StoreFlashesCron.lastFlashCount} → ${currentFlashCount} (after ${StoreFlashesCron.consecutiveNoChanges} unchanged)`);
+    StoreFlashesCron.consecutiveNoChanges = 0;
+    StoreFlashesCron.lastFlashCount = currentFlashCount;
 
     const flattened = [...flashes.with_paris, ...flashes.without_paris];
-    await this.processFlashes(flattened, 'new-flashes', flashes);
+    await StoreFlashesCron.processFlashes(flattened, 'new-flashes', flashes);
   }
 
-  private async processFlashes(flattened: any[], context: string, originalFlashes?: any): Promise<void> {
+  private static async processFlashes(flattened: any[], context: string, originalFlashes?: any): Promise<void> {
     try {
       // Get flashcastr users to filter paris flashes
       const flashcastrUsers = await new FlashcastrUsersDb().getMany({});
@@ -108,7 +111,7 @@ export class StoreFlashesCron extends CronTask {
 
       // First, check which flashes already exist in DB
       const flashIds = flashesToProcess.map(f => f.flash_id);
-      const existingFlashes = await this.getFlashesByIds(flashIds);
+      const existingFlashes = await StoreFlashesCron.getFlashesByIds(flashIds);
       const existingFlashIds = new Set(existingFlashes.map(f => f.flash_id));
       
       // Clear flashIds array to free memory
@@ -121,9 +124,9 @@ export class StoreFlashesCron extends CronTask {
         console.log(`[StoreFlashesCron] Successfully wrote ${writtenDocuments.length} documents to database`);
       } catch (dbError) {
         console.error(`[StoreFlashesCron] Database write failed (${context}):`, dbError);
-        
+
         // Persist failed flashes to disk for retry
-        await this.diskPersistence.persistFailedFlashes(flashesToProcess, `database-write-failure-${context}: ${(dbError as Error).message}`);
+        await StoreFlashesCron.diskPersistence.persistFailedFlashes(flashesToProcess, `database-write-failure-${context}: ${(dbError as Error).message}`);
         
         // Don't proceed to RabbitMQ if database write failed
         return;
@@ -182,7 +185,7 @@ export class StoreFlashesCron extends CronTask {
 
       // Persist any failed RabbitMQ publishes to disk
       if (failedPublishes.length > 0) {
-        await this.diskPersistence.persistFailedFlashes(failedPublishes, `rabbitmq-publish-failure-${context}`);
+        await StoreFlashesCron.diskPersistence.persistFailedFlashes(failedPublishes, `rabbitmq-publish-failure-${context}`);
       }
 
       // Logging for successful operations
@@ -204,23 +207,23 @@ export class StoreFlashesCron extends CronTask {
 
       // Clear successfully processed failed flashes if this was a retry
       if (context === 'retry-failed-flashes' && publishCount > 0) {
-        await this.diskPersistence.clearFailedFlashes();
+        await StoreFlashesCron.diskPersistence.clearFailedFlashes();
       }
 
     } catch (error) {
       console.error(`[StoreFlashesCron] Unexpected error processing flashes (${context}):`, error);
-      
+
       // Persist all flashes to disk if we hit an unexpected error
-      await this.diskPersistence.persistFailedFlashes(flattened, `unexpected-error-${context}: ${(error as Error).message}`);
+      await StoreFlashesCron.diskPersistence.persistFailedFlashes(flattened, `unexpected-error-${context}: ${(error as Error).message}`);
     }
   }
 
-  private async getFlashesByIds(flashIds: number[]): Promise<any[]> {
+  private static async getFlashesByIds(flashIds: number[]): Promise<any[]> {
     const flashesDb = new PostgresFlashesDb();
     return await flashesDb.getByIds(flashIds);
   }
 
-  private isPeakFlashTime(): boolean {
+  private static isPeakFlashTime(): boolean {
     // Peak flash times: European daytime (6 AM - 11 PM CET/CEST)
     // CET is UTC+1, CEST is UTC+2. Using UTC+1 as baseline.
     const now = new Date();

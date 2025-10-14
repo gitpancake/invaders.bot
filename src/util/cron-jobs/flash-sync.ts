@@ -12,13 +12,17 @@ import { CronTask } from "./base";
 config({ path: ".env" });
 
 export class FlashSyncCron extends CronTask {
-  private flashTimespanMins = 10080;
+  private static flashTimespanMins = 60; // 1 hour lookback
 
   constructor(schedule: string) {
     super("flash-sync", schedule);
   }
 
   public async task(): Promise<void> {
+    return FlashSyncCron.executeTask();
+  }
+
+  public static async executeTask(): Promise<void> {
     try {
       /* ------------------------------------------------------------------ */
       /* 1.  Fetch registered users                                         */
@@ -31,7 +35,7 @@ export class FlashSyncCron extends CronTask {
       /* ------------------------------------------------------------------ */
       /* 2.  Fetch flashes from the last N minutes                          */
       /* ------------------------------------------------------------------ */
-      const sinceUnix = getUnixTime(new Date(Date.now() - this.flashTimespanMins * 60_000));
+      const sinceUnix = getUnixTime(new Date(Date.now() - FlashSyncCron.flashTimespanMins * 60_000));
       const flashes = await new PostgresFlashesDb().getSinceByPlayers(
         sinceUnix,
         [...usersByUsername.keys()].map((u) => u.toLowerCase())
