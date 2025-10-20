@@ -23,6 +23,11 @@ export class CombinedSyncCron extends CronTask {
       console.log("[CombinedSyncCron] Starting FlashSyncCron...");
       await FlashSyncCron.executeTask();
       console.log("[CombinedSyncCron] FlashSyncCron completed");
+
+      // Step 4: Retry any previously failed casts
+      console.log("[CombinedSyncCron] Starting retry of failed casts...");
+      await FlashSyncCron.retryFailedCasts();
+      console.log("[CombinedSyncCron] Retry of failed casts completed");
     } catch (error) {
       console.error("[CombinedSyncCron] Error in combined sync:", error);
       throw error;

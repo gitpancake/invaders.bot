@@ -13,6 +13,8 @@ config({ path: ".env" });
 
 export class FlashSyncCron extends CronTask {
   private static flashTimespanMins = 60; // 1 hour lookback
+  private static retryLookbackDays = 7; // 7 days lookback for retries
+  private static maxRetriesPerRun = 50; // Max flashes to retry per run
 
   constructor(schedule: string) {
     super("flash-sync", schedule);
@@ -91,8 +93,9 @@ export class FlashSyncCron extends CronTask {
               channelId: "invaders",
             });
           } catch (err) {
-            console.error("Failed to auto-cast:", err);
-            throw err;
+            console.error(`Failed to auto-cast flash ${flash.flash_id}:`, err);
+            // Don't throw - continue processing other flashes
+            // This flash will be recorded with cast_hash: null for later retry
           }
         }
 
@@ -113,6 +116,68 @@ export class FlashSyncCron extends CronTask {
       console.log(`${docs.length} flashes processed, ` + `${docs.filter((d) => d.cast_hash).length} auto-casts. ` + formattedCurrentTime());
     } catch (error) {
       console.error("flash-sync cron failed:", error);
+    }
+  }
+
+  public static async retryFailedCasts(): Promise<void> {
+    try {
+      console.log("[FlashSyncCron] Starting retry of failed casts...");
+
+      /* ------------------------------------------------------------------ */
+      /* 1.  Fetch flashes with failed casts                                */
+      /* ------------------------------------------------------------------ */
+      const flashcastrFlashesDb = new FlashcastrFlashesDb();
+      const failedFlashes = await flashcastrFlashesDb.getFailedCastsForRetry(
+        FlashSyncCron.maxRetriesPerRun,
+        FlashSyncCron.retryLookbackDays
+      );
+
+      if (!failedFlashes.length) {
+        console.log("[FlashSyncCron] No failed casts to retry");
+        return;
+      }
+
+      console.log(`[FlashSyncCron] Found ${failedFlashes.length} failed casts to retry`);
+
+      /* ------------------------------------------------------------------ */
+      /* 2.  Attempt to cast each failed flash                              */
+      /* ------------------------------------------------------------------ */
+      const publisher = new NeynarUsers();
+      let successCount = 0;
+      let failCount = 0;
+
+      for (const flash of failedFlashes) {
+        try {
+          const decryptionKey = process.env.SIGNER_ENCRYPTION_KEY;
+
+          if (!decryptionKey) {
+            console.error("SIGNER_ENCRYPTION_KEY is not defined");
+            continue;
+          }
+
+          const castHash = await publisher.publishCast({
+            signerUuid: decrypt(flash.signer_uuid, decryptionKey),
+            msg: `I just flashed an Invader in ${flash.city}! 👾`,
+            embeds: [{ url: `https://www.flashcastr.app/flash/${flash.flash_id}` }],
+            channelId: "invaders",
+          });
+
+          // Update the cast hash in database
+          await flashcastrFlashesDb.updateCastHash(flash.flash_id, castHash);
+          successCount++;
+          console.log(`[FlashSyncCron] Successfully retried cast for flash ${flash.flash_id}`);
+        } catch (err) {
+          failCount++;
+          console.error(`[FlashSyncCron] Failed to retry cast for flash ${flash.flash_id}:`, err);
+          // Continue to next flash
+        }
+      }
+
+      console.log(
+        `[FlashSyncCron] Retry complete: ${successCount} successful, ${failCount} failed. ` + formattedCurrentTime()
+      );
+    } catch (error) {
+      console.error("[FlashSyncCron] Retry failed casts task failed:", error);
     }
   }
 }
