@@ -95,4 +95,75 @@ export class FlashcastrFlashesDb extends Postgres<FlashcastrFlash> {
 
     return await this.query(sql, []);
   }
+
+  async getAllCastsForVerification(): Promise<any[]> {
+    const sql = `
+      SELECT
+        ff.flash_id,
+        ff.cast_hash,
+        ff.user_fid,
+        ff.user_username,
+        fu.signer_uuid,
+        fu.auto_cast,
+        f.city,
+        f.ipfs_cid
+      FROM flashcastr_flashes ff
+      INNER JOIN flashcastr_users fu ON ff.user_fid = fu.fid
+      INNER JOIN flashes f ON ff.flash_id = f.flash_id
+      WHERE f.ipfs_cid IS NOT NULL
+        AND f.ipfs_cid != ''
+        AND fu.auto_cast = true
+      ORDER BY ff.flash_id DESC
+    `;
+
+    return await this.query(sql, []);
+  }
+
+  async getNullCastsForFid(fid: number): Promise<any[]> {
+    const sql = `
+      SELECT
+        ff.flash_id,
+        ff.user_fid,
+        ff.user_username,
+        fu.signer_uuid,
+        fu.auto_cast,
+        f.city,
+        f.ipfs_cid
+      FROM flashcastr_flashes ff
+      INNER JOIN flashcastr_users fu ON ff.user_fid = fu.fid
+      INNER JOIN flashes f ON ff.flash_id = f.flash_id
+      WHERE ff.cast_hash IS NULL
+        AND ff.user_fid = $1
+        AND f.ipfs_cid IS NOT NULL
+        AND f.ipfs_cid != ''
+        AND fu.auto_cast = true
+      ORDER BY ff.flash_id DESC
+    `;
+
+    return await this.query(sql, [fid]);
+  }
+
+  async getAllCastsWithHashesForFid(fid: number): Promise<any[]> {
+    const sql = `
+      SELECT
+        ff.flash_id,
+        ff.cast_hash,
+        ff.user_fid,
+        ff.user_username,
+        fu.signer_uuid,
+        fu.auto_cast,
+        f.city,
+        f.ipfs_cid
+      FROM flashcastr_flashes ff
+      INNER JOIN flashcastr_users fu ON ff.user_fid = fu.fid
+      INNER JOIN flashes f ON ff.flash_id = f.flash_id
+      WHERE ff.cast_hash IS NOT NULL
+        AND ff.user_fid = $1
+        AND f.ipfs_cid IS NOT NULL
+        AND f.ipfs_cid != ''
+      ORDER BY ff.flash_id DESC
+    `;
+
+    return await this.query(sql, [fid]);
+  }
 }

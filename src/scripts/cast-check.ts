@@ -24,8 +24,9 @@ class CastChecker {
   private flashcastrUsersDb: FlashcastrUsersDb;
   private flashesDb: PostgresFlashesDb;
   private neynarUsers: NeynarUsers;
+  private fid: number | null;
 
-  constructor() {
+  constructor(fid: number | null = null) {
     if (!process.env.NEYNAR_API_KEY) {
       throw new Error("NEYNAR_API_KEY is not defined");
     }
@@ -38,6 +39,7 @@ class CastChecker {
     this.flashcastrUsersDb = new FlashcastrUsersDb();
     this.flashesDb = new PostgresFlashesDb();
     this.neynarUsers = new NeynarUsers();
+    this.fid = fid;
   }
 
   /**
@@ -65,6 +67,9 @@ class CastChecker {
    * Get all casts with hashes from the database
    */
   private async getAllCastsWithHashes(): Promise<any[]> {
+    if (this.fid) {
+      return await this.flashcastrFlashesDb.getAllCastsWithHashesForFid(this.fid);
+    }
     return await this.flashcastrFlashesDb.getAllCastsWithHashes();
   }
 
@@ -103,7 +108,11 @@ class CastChecker {
    * Main function to check all casts and repair broken ones
    */
   public async run(): Promise<void> {
-    console.log("🔍 Starting cast verification...\n");
+    if (this.fid) {
+      console.log(`🔍 Starting cast verification for FID ${this.fid}...\n`);
+    } else {
+      console.log("🔍 Starting cast verification for all users...\n");
+    }
 
     try {
       // Get all casts with hashes
@@ -204,8 +213,21 @@ class CastChecker {
   }
 }
 
+// Parse FID from command line arguments (optional)
+const args = process.argv.slice(2);
+const fidArg = args.find((arg) => arg.startsWith("fid="));
+let fid: number | null = null;
+
+if (fidArg) {
+  fid = parseInt(fidArg.split("=")[1]);
+  if (isNaN(fid) || fid <= 0) {
+    console.error("❌ Error: Invalid FID. Must be a positive number.");
+    process.exit(1);
+  }
+}
+
 // Run the script
-const checker = new CastChecker();
+const checker = new CastChecker(fid);
 checker
   .run()
   .then(() => {

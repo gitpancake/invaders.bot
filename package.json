@@ -13,7 +13,8 @@
     "watch": "tsc -w",
     "test": "echo \"Error: no test specified\" && exit 1",
     "prepare": "husky",
-    "cast-check": "ts-node src/scripts/cast-check.ts"
+    "cast-check": "ts-node src/scripts/cast-check.ts",
+    "cast-nulls": "ts-node src/scripts/cast-nulls.ts"
   },
   "keywords": [],
   "author": "",
