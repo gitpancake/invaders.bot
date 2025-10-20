@@ -25,6 +25,7 @@ class CastChecker {
   private flashesDb: PostgresFlashesDb;
   private neynarUsers: NeynarUsers;
   private fid: number | null;
+  private concurrencyLimit: number = 10; // Check 10 casts in parallel
 
   constructor(fid: number | null = null) {
     if (!process.env.NEYNAR_API_KEY) {
@@ -138,18 +139,32 @@ class CastChecker {
       }
 
       const brokenCasts: BrokenCast[] = [];
-      let checkedCount = 0;
       let existsCount = 0;
       let brokenCount = 0;
 
-      // Check each cast
-      console.log("Checking casts...");
-      for (const cast of casts) {
-        checkedCount++;
-        process.stdout.write(`\rProgress: ${checkedCount}/${casts.length} checked...`);
+      // Check casts in parallel batches
+      console.log(`Checking casts (${this.concurrencyLimit} at a time)...`);
 
-        const exists = await this.castExists(cast.cast_hash);
+      let checkedCount = 0;
+      const checkResults: Array<{ cast: any; exists: boolean }> = [];
 
+      for (let i = 0; i < casts.length; i += this.concurrencyLimit) {
+        const batch = casts.slice(i, i + this.concurrencyLimit);
+
+        const batchResults = await Promise.all(
+          batch.map(async (cast) => {
+            const exists = await this.castExists(cast.cast_hash);
+            checkedCount++;
+            process.stdout.write(`\rProgress: ${checkedCount}/${casts.length} checked...`);
+            return { cast, exists };
+          })
+        );
+
+        checkResults.push(...batchResults);
+      }
+
+      // Process results
+      for (const { cast, exists } of checkResults) {
         if (exists) {
           existsCount++;
         } else {
@@ -164,9 +179,6 @@ class CastChecker {
             ipfs_cid: cast.ipfs_cid,
           });
         }
-
-        // Rate limit: small delay between checks
-        await new Promise((resolve) => setTimeout(resolve, 100));
       }
 
       console.log("\n");
