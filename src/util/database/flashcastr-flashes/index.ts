@@ -44,19 +44,19 @@ export class FlashcastrFlashesDb extends Postgres<FlashcastrFlash> {
         ff.user_pfp_url,
         fu.signer_uuid,
         fu.auto_cast,
-        inf.player,
-        inf.city,
-        inf.ipfs_cid,
-        inf.timestamp
+        f.player,
+        f.city,
+        f.ipfs_cid,
+        EXTRACT(EPOCH FROM f.timestamp)::bigint as timestamp
       FROM flashcastr_flashes ff
       INNER JOIN flashcastr_users fu ON ff.user_fid = fu.fid
-      INNER JOIN invader_flashes inf ON ff.flash_id = inf.flash_id
+      INNER JOIN flashes f ON ff.flash_id = f.flash_id
       WHERE ff.cast_hash IS NULL
         AND fu.auto_cast = true
-        AND inf.ipfs_cid IS NOT NULL
-        AND inf.ipfs_cid != ''
-        AND inf.timestamp > EXTRACT(EPOCH FROM NOW() - INTERVAL '${sinceDays} days')
-      ORDER BY inf.timestamp DESC
+        AND f.ipfs_cid IS NOT NULL
+        AND f.ipfs_cid != ''
+        AND f.timestamp > NOW() - INTERVAL '${sinceDays} days'
+      ORDER BY f.timestamp DESC
       LIMIT $1
     `;
 
