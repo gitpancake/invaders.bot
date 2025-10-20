@@ -53,11 +53,24 @@ class CastChecker {
       });
       return true;
     } catch (error: any) {
+      // Handle 401 authentication errors
+      if (error.response?.status === 401) {
+        console.error(`\n❌ Authentication failed: Invalid or expired Neynar API key`);
+        console.error("Please check your NEYNAR_API_KEY environment variable\n");
+        throw new Error("Neynar API authentication failed (401)");
+      }
+
       // If cast not found, Neynar throws an error
       if (error.message?.includes("not found") || error.response?.status === 404) {
         return false;
       }
+
       // For other errors (rate limits, network issues), log and treat as existing to be safe
+      if (error.response?.status === 429) {
+        console.error(`\n⚠️  Rate limit hit. Please wait and try again later.\n`);
+        throw new Error("Neynar API rate limit exceeded (429)");
+      }
+
       console.error(`Error checking cast ${castHash}:`, error.message);
       return true; // Assume exists to avoid unnecessary recasts
     }
