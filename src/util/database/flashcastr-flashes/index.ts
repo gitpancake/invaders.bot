@@ -72,4 +72,27 @@ export class FlashcastrFlashesDb extends Postgres<FlashcastrFlash> {
 
     await this.query(sql, [castHash, flashId]);
   }
+
+  async getAllCastsWithHashes(): Promise<any[]> {
+    const sql = `
+      SELECT
+        ff.flash_id,
+        ff.cast_hash,
+        ff.user_fid,
+        ff.user_username,
+        fu.signer_uuid,
+        fu.auto_cast,
+        f.city,
+        f.ipfs_cid
+      FROM flashcastr_flashes ff
+      INNER JOIN flashcastr_users fu ON ff.user_fid = fu.fid
+      INNER JOIN flashes f ON ff.flash_id = f.flash_id
+      WHERE ff.cast_hash IS NOT NULL
+        AND f.ipfs_cid IS NOT NULL
+        AND f.ipfs_cid != ''
+      ORDER BY ff.flash_id DESC
+    `;
+
+    return await this.query(sql, []);
+  }
 }

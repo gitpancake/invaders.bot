@@ -12,7 +12,8 @@
     "build": "tsc",
     "watch": "tsc -w",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "prepare": "husky"
+    "prepare": "husky",
+    "cast-check": "ts-node src/scripts/cast-check.ts"
   },
   "keywords": [],
   "author": "",
